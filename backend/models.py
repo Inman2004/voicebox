@@ -11,6 +11,9 @@ from .utils.capture_chords import (
     default_toggle_to_talk_chord,
 )
 
+# Single source for engine validation across request schemas.
+ENGINE_PATTERN = "^(qwen|qwen_custom_voice|luxtts|chatterbox|chatterbox_turbo|tada|kokoro)$"
+
 
 class VoiceProfileCreate(BaseModel):
     """Request model for creating a voice profile."""
@@ -76,6 +79,37 @@ class ProfileSampleResponse(BaseModel):
         from_attributes = True
 
 
+class WordReplacement(BaseModel):
+    """One "sound word" substitution applied before synthesis."""
+
+    source: str = Field(..., min_length=1, max_length=200, alias="from")
+    target: str = Field(default="", max_length=200, alias="to")
+
+    model_config = {"populate_by_name": True}
+
+
+class PreprocessingOptions(BaseModel):
+    """Text clean-up applied before the text reaches the TTS engine."""
+
+    normalize_whitespace: bool = True
+    smart_numbers: bool = False
+    lowercase: bool = False
+    fix_initials: bool = True
+    remove_reference_numbers: bool = True
+    sentence_pause_ms: int = Field(default=0, ge=0, le=5000)
+    replacements: List[WordReplacement] = Field(default_factory=list, max_length=500)
+
+
+class PostprocessingOptions(BaseModel):
+    """Audio clean-up applied after synthesis, before any effects chain."""
+
+    remove_silence: bool = False
+    loudness: str = Field(default="broadcast", pattern="^(off|simple|broadcast)$")
+    # -16 LUFS is the common target for spoken-word content and roughly
+    # matches the loudness of the previous RMS normalizer.
+    target_lufs: float = Field(default=-16.0, ge=-40.0, le=-8.0)
+
+
 class GenerationRequest(BaseModel):
     """Request model for voice generation."""
 
@@ -85,7 +119,7 @@ class GenerationRequest(BaseModel):
     seed: Optional[int] = Field(None, ge=0)
     model_size: Optional[str] = Field(default="1.7B", pattern="^(1\\.7B|0\\.6B|1B|3B)$")
     instruct: Optional[str] = Field(None, max_length=500)
-    engine: Optional[str] = Field(default="qwen", pattern="^(qwen|qwen_custom_voice|luxtts|chatterbox|chatterbox_turbo|tada|kokoro)$")
+    engine: Optional[str] = Field(default="qwen", pattern=ENGINE_PATTERN)
     personality: bool = Field(
         default=False,
         description="When true and the profile has a personality prompt, the input text is rewritten in-character before TTS.",
@@ -99,6 +133,16 @@ class GenerationRequest(BaseModel):
     normalize: bool = Field(default=True, description="Normalize output audio volume")
     effects_chain: Optional[List["EffectConfig"]] = Field(
         None, description="Effects chain to apply after generation (overrides profile default)"
+    )
+    speed: Optional[float] = Field(
+        None, ge=0.5, le=2.0, description="Speech rate multiplier. Omit to use the saved default."
+    )
+    preprocessing: Optional[PreprocessingOptions] = Field(
+        None, description="Text preprocessing. Omit to use the saved defaults."
+    )
+    postprocessing: Optional[PostprocessingOptions] = Field(
+        None,
+        description="Audio post-processing. Omit to use the saved defaults (legacy `normalize` still honoured).",
     )
 
 
@@ -119,6 +163,10 @@ class GenerationResponse(BaseModel):
     error: Optional[str] = None
     is_favorited: bool = False
     source: str = "manual"
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    load_seconds: Optional[float] = None
+    generation_seconds: Optional[float] = None
     created_at: datetime
     versions: Optional[List["GenerationVersionResponse"]] = None
     active_version_id: Optional[str] = None
@@ -127,13 +175,58 @@ class GenerationResponse(BaseModel):
         from_attributes = True
 
 
+HISTORY_SORT_PATTERN = "^(created_at|duration|generation_seconds|profile_name|text_length)$"
+HISTORY_GROUP_PATTERN = "^(none|date|profile|engine|language|status)$"
+
+
 class HistoryQuery(BaseModel):
     """Query model for generation history."""
 
     profile_id: Optional[str] = None
     search: Optional[str] = None
+    engine: Optional[str] = None
+    language: Optional[str] = None
+    # "completed" | "failed" | "in_progress" (loading_model + generating)
+    status: Optional[str] = Field(default=None, pattern="^(completed|failed|in_progress)$")
+    favorites_only: bool = False
+    sort_by: str = Field(default="created_at", pattern=HISTORY_SORT_PATTERN)
+    order: str = Field(default="desc", pattern="^(asc|desc)$")
+    # Rows are ordered by the group key first so groups arrive contiguous
+    # across pages.
+    group_by: str = Field(default="none", pattern=HISTORY_GROUP_PATTERN)
     limit: int = Field(default=50, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
+
+
+class HistoryFacetValue(BaseModel):
+    value: str
+    label: str
+    count: int
+    avatar_url: Optional[str] = None
+
+
+class HistoryFacetsResponse(BaseModel):
+    total: int
+    total_duration_seconds: float
+    total_generation_seconds: float
+    favorites: int
+    profiles: List[HistoryFacetValue]
+    engines: List[HistoryFacetValue]
+    languages: List[HistoryFacetValue]
+    statuses: List[HistoryFacetValue]
+
+
+class HistoryBulkRequest(BaseModel):
+    ids: List[str] = Field(..., min_length=1, max_length=1000)
+    action: str = Field(..., pattern="^(delete|favorite|unfavorite)$")
+
+
+class HistoryBulkResponse(BaseModel):
+    affected: int
+
+
+class HistoryExportZipRequest(BaseModel):
+    ids: List[str] = Field(..., min_length=1, max_length=1000)
 
 
 class HistoryResponse(BaseModel):
@@ -142,6 +235,7 @@ class HistoryResponse(BaseModel):
     id: str
     profile_id: str
     profile_name: str
+    profile_avatar_url: Optional[str] = None
     text: str
     language: str
     audio_path: Optional[str] = None
@@ -153,6 +247,10 @@ class HistoryResponse(BaseModel):
     status: str = "completed"
     error: Optional[str] = None
     is_favorited: bool = False
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    load_seconds: Optional[float] = None
+    generation_seconds: Optional[float] = None
     created_at: datetime
     versions: Optional[List["GenerationVersionResponse"]] = None
     active_version_id: Optional[str] = None
@@ -293,6 +391,9 @@ class GenerationSettingsResponse(BaseModel):
     crossfade_ms: int = Field(default=50, ge=0, le=500)
     normalize_audio: bool = True
     autoplay_on_generate: bool = True
+    speed: float = Field(default=1.0, ge=0.5, le=2.0)
+    preprocessing: PreprocessingOptions = Field(default_factory=PreprocessingOptions)
+    postprocessing: PostprocessingOptions = Field(default_factory=PostprocessingOptions)
 
     class Config:
         from_attributes = True
@@ -305,6 +406,126 @@ class GenerationSettingsUpdate(BaseModel):
     crossfade_ms: Optional[int] = Field(default=None, ge=0, le=500)
     normalize_audio: Optional[bool] = None
     autoplay_on_generate: Optional[bool] = None
+    speed: Optional[float] = Field(default=None, ge=0.5, le=2.0)
+    preprocessing: Optional[PreprocessingOptions] = None
+    postprocessing: Optional[PostprocessingOptions] = None
+
+
+class GenerationPresetSettings(BaseModel):
+    """The rail values a generation preset snapshots."""
+
+    speed: float = Field(default=1.0, ge=0.5, le=2.0)
+    preprocessing: PreprocessingOptions = Field(default_factory=PreprocessingOptions)
+    postprocessing: PostprocessingOptions = Field(default_factory=PostprocessingOptions)
+
+
+class GenerationPresetCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    settings: GenerationPresetSettings
+
+
+class GenerationPresetUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    settings: Optional[GenerationPresetSettings] = None
+
+
+class GenerationPresetResponse(BaseModel):
+    id: str
+    name: str
+    settings: GenerationPresetSettings
+    is_builtin: bool
+    created_at: datetime
+
+
+class EngineParameterResponse(BaseModel):
+    key: str
+    label: str
+    min: float
+    max: float
+    step: float
+    default: float
+    unit: str = ""
+    help: str = ""
+
+
+class EngineVariantResponse(BaseModel):
+    model_name: str
+    display_name: str
+    model_size: str
+    size_mb: int
+    languages: List[str]
+
+
+class EngineResponse(BaseModel):
+    engine: str
+    display_name: str
+    tagline: str
+    description: str
+    icon: str
+    color: str
+    languages: List[str]
+    supports_cloning: bool
+    supports_presets: bool
+    supports_instruct: bool
+    supports_tags: bool
+    native_speed: bool
+    speed_rating: int
+    quality_rating: int
+    parameters: List[EngineParameterResponse]
+    variants: List[EngineVariantResponse]
+
+
+class EngineListResponse(BaseModel):
+    engines: List[EngineResponse]
+
+
+class LibraryVoice(BaseModel):
+    """A voice as shown in the Voice Library — either a built-in engine
+    preset or one of the user's own profiles."""
+
+    key: str  # "preset:<engine>:<voice_id>" or "profile:<id>"
+    kind: str  # "preset" | "profile"
+    name: str
+    engine: Optional[str] = None
+    voice_id: Optional[str] = None
+    profile_id: Optional[str] = None
+    voice_type: Optional[str] = None
+    gender: Optional[str] = None
+    language: str
+    locale: Optional[str] = None
+    accent: Optional[str] = None
+    age: Optional[str] = None
+    styles: List[str] = Field(default_factory=list)
+    description: Optional[str] = None
+    avatar_url: Optional[str] = None
+    favorite: bool = False
+    has_preview: bool = True
+
+
+class LibraryVoiceListResponse(BaseModel):
+    voices: List[LibraryVoice]
+
+
+class ActivateVoiceRequest(BaseModel):
+    engine: str = Field(..., pattern=ENGINE_PATTERN)
+    voice_id: str = Field(..., min_length=1, max_length=100)
+
+
+class ActivateVoiceResponse(BaseModel):
+    profile_id: str
+    created: bool
+
+
+class SystemResourcesResponse(BaseModel):
+    cpu_percent: Optional[float] = None
+    app_ram_mb: Optional[float] = None
+    system_ram_used_mb: Optional[float] = None
+    system_ram_total_mb: Optional[float] = None
+    gpu_percent: Optional[float] = None
+    gpu_name: Optional[str] = None
+    vram_used_mb: Optional[float] = None
+    vram_total_mb: Optional[float] = None
+    loaded_models: List[str] = Field(default_factory=list)
 
 
 class MCPClientBindingResponse(BaseModel):
@@ -317,7 +538,7 @@ class MCPClientBindingResponse(BaseModel):
     profile_id: Optional[str] = None
     default_engine: Optional[str] = Field(
         None,
-        pattern="^(qwen|qwen_custom_voice|luxtts|chatterbox|chatterbox_turbo|tada|kokoro)$",
+        pattern=ENGINE_PATTERN,
     )
     default_personality: bool = False
     last_seen_at: Optional[datetime] = None
@@ -336,7 +557,7 @@ class MCPClientBindingUpsert(BaseModel):
     profile_id: Optional[str] = None
     default_engine: Optional[str] = Field(
         None,
-        pattern="^(qwen|qwen_custom_voice|luxtts|chatterbox|chatterbox_turbo|tada|kokoro)$",
+        pattern=ENGINE_PATTERN,
     )
     default_personality: bool = False
 
@@ -355,7 +576,7 @@ class SpeakRequest(BaseModel):
     )
     engine: Optional[str] = Field(
         None,
-        pattern="^(qwen|qwen_custom_voice|luxtts|chatterbox|chatterbox_turbo|tada|kokoro)$",
+        pattern=ENGINE_PATTERN,
     )
     personality: Optional[bool] = Field(
         None,

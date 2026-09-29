@@ -12,12 +12,13 @@ from .models import (
     AudioChannel,
     EffectPreset,
     Generation,
+    GenerationPreset,
     GenerationVersion,
     ProfileChannelMapping,
     VoiceProfile,
 )
 from .migrations import run_migrations
-from .seed import backfill_generation_versions, seed_builtin_presets
+from .seed import backfill_generation_versions, seed_builtin_generation_presets, seed_builtin_presets
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,7 @@ def init_db() -> None:
 
     backfill_generation_versions(SessionLocal, Generation, GenerationVersion)
     seed_builtin_presets(SessionLocal, EffectPreset)
+    seed_builtin_generation_presets(SessionLocal, GenerationPreset)
 
 
 def get_db():

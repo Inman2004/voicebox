@@ -1,0 +1,22 @@
+{
+  "kokoro:af_alloy": 3, "kokoro:af_aoede": 61, "kokoro:af_bella": 89, "kokoro:af_heart": 36,
+  "kokoro:af_jessica": 88, "kokoro:af_kore": 68, "kokoro:af_nicole": 157, "kokoro:af_nova": 70,
+  "kokoro:af_river": 93, "kokoro:af_sarah": 127, "kokoro:af_sky": 75,
+  "kokoro:am_adam": 16, "kokoro:am_echo": 59, "kokoro:am_eric": 18, "kokoro:am_fenrir": 101,
+  "kokoro:am_liam": 56, "kokoro:am_michael": 104, "kokoro:am_onyx": 25, "kokoro:am_puck": 39,
+  "kokoro:am_santa": 31,
+  "kokoro:bf_alice": 38, "kokoro:bf_emma": 97, "kokoro:bf_isabella": 22, "kokoro:bf_lily": 8,
+  "kokoro:bm_daniel": 9, "kokoro:bm_fable": 33, "kokoro:bm_george": 32, "kokoro:bm_lewis": 51,
+  "kokoro:ef_dora": 77, "kokoro:em_alex": 52, "kokoro:em_santa": 30,
+  "kokoro:ff_siwis": 58,
+  "kokoro:hf_alpha": 1, "kokoro:hf_beta": 83, "kokoro:hm_omega": 92, "kokoro:hm_psi": 24,
+  "kokoro:if_sara": 90, "kokoro:im_nicola": 76,
+  "kokoro:jf_alpha": 62, "kokoro:jf_gongitsune": 0, "kokoro:jf_nezumi": 42, "kokoro:jf_tebukuro": 74,
+  "kokoro:jm_kumo": 146,
+  "kokoro:pf_dora": 72, "kokoro:pm_alex": 149, "kokoro:pm_santa": 34,
+  "kokoro:zf_xiaobei": 126, "kokoro:zf_xiaoni": 4, "kokoro:zf_xiaoxiao": 55, "kokoro:zf_xiaoyi": 84,
+  "kokoro:zm_yunjian": 79, "kokoro:zm_yunxi": 147, "kokoro:zm_yunxia": 10, "kokoro:zm_yunyang": 118,
+  "qwen_custom_voice:Vivian": 81, "qwen_custom_voice:Serena": 117, "qwen_custom_voice:Uncle_Fu": 105,
+  "qwen_custom_voice:Dylan": 112, "qwen_custom_voice:Eric": 131, "qwen_custom_voice:Ryan": 107,
+  "qwen_custom_voice:Aiden": 111, "qwen_custom_voice:Ono_Anna": 69, "qwen_custom_voice:Sohee": 119
+}

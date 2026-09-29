@@ -102,6 +102,32 @@ def enqueue_generation(generation_id: str, coro):
     _generation_queue.put_nowait(GenerationJob(generation_id=generation_id, coro=coro))
 
 
+async def run_serialized(job_id: str, coro_fn):
+    """Run ``coro_fn()`` on the serial worker and return its result.
+
+    For short inference jobs that aren't history rows (voice previews) but
+    must still not overlap a running generation on the GPU.
+    """
+    if _generation_queue is None:
+        return await coro_fn()
+
+    loop = asyncio.get_running_loop()
+    future: asyncio.Future = loop.create_future()
+
+    async def _job():
+        try:
+            result = await coro_fn()
+        except BaseException as e:  # hand the error to the caller, not the worker
+            if not future.done():
+                future.set_exception(e)
+            return
+        if not future.done():
+            future.set_result(result)
+
+    enqueue_generation(job_id, _job())
+    return await future
+
+
 def cancel_generation(generation_id: str) -> Literal["queued", "running"] | None:
     """Cancel a queued or running generation if it is still active."""
     running_task = _running_generation_tasks.get(generation_id)

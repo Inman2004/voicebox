@@ -65,6 +65,39 @@ export interface EffectConfig {
   params: Record<string, number>;
 }
 
+export type EngineId =
+  | 'qwen'
+  | 'qwen_custom_voice'
+  | 'luxtts'
+  | 'chatterbox'
+  | 'chatterbox_turbo'
+  | 'tada'
+  | 'kokoro';
+
+export interface WordReplacement {
+  from: string;
+  to: string;
+}
+
+export interface PreprocessingOptions {
+  normalize_whitespace: boolean;
+  smart_numbers: boolean;
+  lowercase: boolean;
+  fix_initials: boolean;
+  remove_reference_numbers: boolean;
+  /** Extra pause after every sentence, in ms. 0 disables it. */
+  sentence_pause_ms: number;
+  replacements: WordReplacement[];
+}
+
+export type LoudnessMode = 'off' | 'simple' | 'broadcast';
+
+export interface PostprocessingOptions {
+  remove_silence: boolean;
+  loudness: LoudnessMode;
+  target_lufs: number;
+}
+
 export interface GenerationRequest {
   profile_id: string;
   text: string;
@@ -86,6 +119,10 @@ export interface GenerationRequest {
   crossfade_ms?: number;
   normalize?: boolean;
   effects_chain?: EffectConfig[];
+  /** Omit to use the server-saved defaults. */
+  speed?: number;
+  preprocessing?: PreprocessingOptions;
+  postprocessing?: PostprocessingOptions;
 }
 
 export interface GenerationVersionResponse {
@@ -113,20 +150,57 @@ export interface GenerationResponse {
   status: 'loading_model' | 'generating' | 'completed' | 'failed';
   error?: string;
   is_favorited?: boolean;
+  /** When the worker picked the job up (null while queued). */
+  started_at?: string | null;
+  completed_at?: string | null;
+  load_seconds?: number | null;
+  /** Synthesis + post-processing wall time. */
+  generation_seconds?: number | null;
   created_at: string;
   versions?: GenerationVersionResponse[];
   active_version_id?: string;
 }
 
+export type HistorySort = 'created_at' | 'duration' | 'generation_seconds' | 'profile_name' | 'text_length';
+export type HistoryGroup = 'none' | 'date' | 'profile' | 'engine' | 'language' | 'status';
+export type HistoryStatusFilter = 'completed' | 'failed' | 'in_progress';
+
 export interface HistoryQuery {
   profile_id?: string;
   search?: string;
+  engine?: string;
+  language?: string;
+  status?: HistoryStatusFilter;
+  favorites_only?: boolean;
+  sort_by?: HistorySort;
+  order?: 'asc' | 'desc';
+  /** Server orders by the group key first so groups stay contiguous across pages. */
+  group_by?: HistoryGroup;
   limit?: number;
   offset?: number;
 }
 
+export interface HistoryFacetValue {
+  value: string;
+  label: string;
+  count: number;
+  avatar_url?: string | null;
+}
+
+export interface HistoryFacets {
+  total: number;
+  total_duration_seconds: number;
+  total_generation_seconds: number;
+  favorites: number;
+  profiles: HistoryFacetValue[];
+  engines: HistoryFacetValue[];
+  languages: HistoryFacetValue[];
+  statuses: HistoryFacetValue[];
+}
+
 export interface HistoryResponse extends GenerationResponse {
   profile_name: string;
+  profile_avatar_url?: string | null;
   versions?: GenerationVersionResponse[];
   active_version_id?: string;
 }
@@ -246,6 +320,9 @@ export interface GenerationSettings {
   crossfade_ms: number;
   normalize_audio: boolean;
   autoplay_on_generate: boolean;
+  speed: number;
+  preprocessing: PreprocessingOptions;
+  postprocessing: PostprocessingOptions;
 }
 
 export type GenerationSettingsUpdate = Partial<GenerationSettings>;
@@ -559,4 +636,97 @@ export interface CloudStatus {
   key_prefix: string | null;
   connected_at: string | null;
   dashboard_url: string;
+}
+
+// ── Engine registry ──────────────────────────────────────────────────
+
+export interface EngineParameter {
+  key: string;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  default: number;
+  unit: string;
+  help: string;
+}
+
+export interface EngineVariant {
+  model_name: string;
+  display_name: string;
+  model_size: string;
+  size_mb: number;
+  languages: LanguageCode[];
+}
+
+export interface EngineInfo {
+  engine: EngineId;
+  display_name: string;
+  tagline: string;
+  description: string;
+  icon: string;
+  color: string;
+  languages: LanguageCode[];
+  supports_cloning: boolean;
+  supports_presets: boolean;
+  supports_instruct: boolean;
+  supports_tags: boolean;
+  native_speed: boolean;
+  speed_rating: number;
+  quality_rating: number;
+  parameters: EngineParameter[];
+  variants: EngineVariant[];
+}
+
+// ── Voice Library ────────────────────────────────────────────────────
+
+export interface LibraryVoice {
+  /** "preset:<engine>:<voice_id>" or "profile:<id>" */
+  key: string;
+  kind: 'preset' | 'profile';
+  name: string;
+  engine?: string | null;
+  voice_id?: string | null;
+  profile_id?: string | null;
+  voice_type?: string | null;
+  gender?: 'male' | 'female' | string | null;
+  language: string;
+  locale?: string | null;
+  accent?: string | null;
+  age?: 'young' | 'middle_aged' | 'senior' | string | null;
+  styles: string[];
+  description?: string | null;
+  avatar_url?: string | null;
+  favorite: boolean;
+  has_preview: boolean;
+}
+
+// ── Generation presets ───────────────────────────────────────────────
+
+export interface GenerationPresetSettings {
+  speed: number;
+  preprocessing: PreprocessingOptions;
+  postprocessing: PostprocessingOptions;
+}
+
+export interface GenerationPreset {
+  id: string;
+  name: string;
+  settings: GenerationPresetSettings;
+  is_builtin: boolean;
+  created_at: string;
+}
+
+// ── System resources ─────────────────────────────────────────────────
+
+export interface SystemResources {
+  cpu_percent: number | null;
+  app_ram_mb: number | null;
+  system_ram_used_mb: number | null;
+  system_ram_total_mb: number | null;
+  gpu_percent: number | null;
+  gpu_name: string | null;
+  vram_used_mb: number | null;
+  vram_total_mb: number | null;
+  loaded_models: string[];
 }

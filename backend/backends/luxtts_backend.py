@@ -147,6 +147,7 @@ class LuxTTSBackend:
         language: str = "en",
         seed: Optional[int] = None,
         instruct: Optional[str] = None,
+        speed: float = 1.0,
     ) -> Tuple[np.ndarray, int]:
         """
         Generate audio from text using LuxTTS.
@@ -173,7 +174,7 @@ class LuxTTSBackend:
                 num_steps=4,
                 guidance_scale=3.0,
                 t_shift=0.5,
-                speed=1.0,
+                speed=float(speed),
                 return_smooth=False,  # 48kHz output
             )
 

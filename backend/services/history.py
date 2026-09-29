@@ -121,12 +121,20 @@ async def update_generation_status(
     audio_path: Optional[str] = None,
     duration: Optional[float] = None,
     error: Optional[str] = None,
+    **timing,
 ) -> Optional[GenerationResponse]:
-    """Update the status of a generation (used by async generation flow)."""
+    """Update the status of a generation (used by async generation flow).
+
+    ``timing`` may carry ``started_at``, ``completed_at``, ``load_seconds``
+    and ``generation_seconds``.
+    """
     generation = db.query(DBGeneration).filter_by(id=generation_id).first()
     if not generation:
         return None
 
+    for key in ("started_at", "completed_at", "load_seconds", "generation_seconds"):
+        if timing.get(key) is not None:
+            setattr(generation, key, timing[key])
     generation.status = status
     if audio_path is not None:
         generation.audio_path = audio_path
@@ -161,58 +169,97 @@ async def get_generation(
     return GenerationResponse.model_validate(generation)
 
 
+IN_PROGRESS_STATUSES = ("loading_model", "generating")
+
+
+def profile_avatar_url(profile: DBVoiceProfile) -> Optional[str]:
+    """The profile's uploaded avatar, else its built-in voice's bundled one."""
+    if profile.avatar_path:
+        return f"/profiles/{profile.id}/avatar"
+    if (profile.voice_type or "cloned") == "preset" and profile.preset_engine and profile.preset_voice_id:
+        try:
+            from .voice_catalog import get_catalog_voice
+
+            entry = get_catalog_voice(profile.preset_engine, profile.preset_voice_id)
+        except ImportError:  # engine backends unavailable (e.g. minimal test env)
+            return None
+        if entry and entry.avatar:
+            return f"/voices/avatars/{entry.avatar}"
+    return None
+
+
+def _apply_history_filters(q, query: HistoryQuery):
+    if query.profile_id:
+        q = q.filter(DBGeneration.profile_id == query.profile_id)
+    if query.search:
+        pattern = f"%{query.search}%"
+        q = q.filter(or_(DBGeneration.text.like(pattern), DBVoiceProfile.name.like(pattern)))
+    if query.engine:
+        q = q.filter(DBGeneration.engine == query.engine)
+    if query.language:
+        q = q.filter(DBGeneration.language == query.language)
+    if query.status == "in_progress":
+        q = q.filter(DBGeneration.status.in_(IN_PROGRESS_STATUSES))
+    elif query.status == "completed":
+        q = q.filter(or_(DBGeneration.status == "completed", DBGeneration.status.is_(None)))
+    elif query.status == "failed":
+        q = q.filter(DBGeneration.status == "failed")
+    if query.favorites_only:
+        q = q.filter(DBGeneration.is_favorited.is_(True))
+    return q
+
+
+def _history_ordering(query: HistoryQuery) -> list:
+    from sqlalchemy import func
+
+    sort_columns = {
+        "created_at": DBGeneration.created_at,
+        "duration": DBGeneration.duration,
+        "generation_seconds": DBGeneration.generation_seconds,
+        "profile_name": func.lower(DBVoiceProfile.name),
+        "text_length": func.length(DBGeneration.text),
+    }
+    column = sort_columns[query.sort_by]
+    primary = column.asc() if query.order == "asc" else column.desc()
+    # Missing values (e.g. no timing on old rows) always sort last.
+    ordering = [column.is_(None), primary]
+
+    group_columns = {
+        "profile": func.lower(DBVoiceProfile.name),
+        "engine": DBGeneration.engine,
+        "language": DBGeneration.language,
+        "status": DBGeneration.status,
+    }
+    if query.group_by in group_columns:
+        ordering = [group_columns[query.group_by].asc(), *ordering]
+    elif query.group_by == "date" and query.sort_by != "created_at":
+        # Day buckets are contiguous only when ordered by time first.
+        ordering = [func.date(DBGeneration.created_at).desc(), *ordering]
+    # Stable tiebreak so pagination never repeats or skips rows.
+    return [*ordering, DBGeneration.id.asc()]
+
+
 async def list_generations(
     query: HistoryQuery,
     db: Session,
 ) -> HistoryListResponse:
-    """
-    List generations with optional filters.
-    
-    Args:
-        query: Query parameters (filters, pagination)
-        db: Database session
-        
-    Returns:
-        HistoryListResponse with items and total count
-    """
-    # Build base query with join to get profile name
-    q = db.query(
-        DBGeneration,
-        DBVoiceProfile.name.label('profile_name')
-    ).join(
-        DBVoiceProfile,
-        DBGeneration.profile_id == DBVoiceProfile.id
+    """List generations with filters, sorting and optional grouping order."""
+    q = db.query(DBGeneration, DBVoiceProfile).join(
+        DBVoiceProfile, DBGeneration.profile_id == DBVoiceProfile.id
     )
-    
-    # Apply profile filter
-    if query.profile_id:
-        q = q.filter(DBGeneration.profile_id == query.profile_id)
-    
-    # Apply search filter (searches in text content)
-    if query.search:
-        search_pattern = f"%{query.search}%"
-        q = q.filter(DBGeneration.text.like(search_pattern))
-    
-    # Get total count before pagination
+    q = _apply_history_filters(q, query)
+
     total_count = q.count()
-    
-    # Apply ordering (newest first)
-    q = q.order_by(DBGeneration.created_at.desc())
-    
-    # Apply pagination
-    q = q.offset(query.offset).limit(query.limit)
-    
-    # Execute query
-    results = q.all()
-    
-    # Convert to HistoryResponse with profile_name
+    results = q.order_by(*_history_ordering(query)).offset(query.offset).limit(query.limit).all()
+
     items = []
-    for generation, profile_name in results:
+    for generation, profile in results:
         versions, active_version_id = _get_versions_for_generation(generation.id, db)
         items.append(HistoryResponse(
             id=generation.id,
             profile_id=generation.profile_id,
-            profile_name=profile_name,
+            profile_name=profile.name,
+            profile_avatar_url=profile_avatar_url(profile),
             text=generation.text,
             language=generation.language,
             audio_path=generation.audio_path,
@@ -224,11 +271,15 @@ async def list_generations(
             status=generation.status or "completed",
             error=generation.error,
             is_favorited=bool(generation.is_favorited),
+            started_at=generation.started_at,
+            completed_at=generation.completed_at,
+            load_seconds=generation.load_seconds,
+            generation_seconds=generation.generation_seconds,
             created_at=generation.created_at,
             versions=versions,
             active_version_id=active_version_id,
         ))
-    
+
     return HistoryListResponse(
         items=items,
         total=total_count,
@@ -372,3 +423,81 @@ async def get_generation_stats(db: Session) -> dict:
             profile_id: count for profile_id, count in by_profile
         },
     }
+
+
+async def get_history_facets(query: HistoryQuery, db: Session):
+    """Counts per voice / engine / language / status for the Gallery filters.
+
+    Each dimension is counted with every *other* active filter applied, so a
+    selected engine still shows how many results the other engines have.
+    Totals reflect all active filters.
+    """
+    from sqlalchemy import func
+
+    from ..models import HistoryFacetsResponse, HistoryFacetValue
+
+    def base(**drop):
+        narrowed = query.model_copy(update=drop)
+        return _apply_history_filters(
+            db.query(DBGeneration).join(DBVoiceProfile, DBGeneration.profile_id == DBVoiceProfile.id),
+            narrowed,
+        )
+
+    filtered = base()
+    total = filtered.count()
+    totals = filtered.with_entities(
+        func.coalesce(func.sum(DBGeneration.duration), 0.0),
+        func.coalesce(func.sum(DBGeneration.generation_seconds), 0.0),
+    ).one()
+    favorites = base(favorites_only=False).filter(DBGeneration.is_favorited.is_(True)).count()
+
+    profile_rows = (
+        base(profile_id=None)
+        .with_entities(DBVoiceProfile, func.count(DBGeneration.id))
+        .group_by(DBVoiceProfile.id)
+        .order_by(func.lower(DBVoiceProfile.name))
+        .all()
+    )
+    engine_rows = (
+        base(engine=None)
+        .with_entities(DBGeneration.engine, func.count(DBGeneration.id))
+        .group_by(DBGeneration.engine)
+        .all()
+    )
+    language_rows = (
+        base(language=None)
+        .with_entities(DBGeneration.language, func.count(DBGeneration.id))
+        .group_by(DBGeneration.language)
+        .all()
+    )
+    status_rows = (
+        base(status=None)
+        .with_entities(DBGeneration.status, func.count(DBGeneration.id))
+        .group_by(DBGeneration.status)
+        .all()
+    )
+
+    status_counts = {"completed": 0, "in_progress": 0, "failed": 0}
+    for status, count in status_rows:
+        key = "in_progress" if status in IN_PROGRESS_STATUSES else ("failed" if status == "failed" else "completed")
+        status_counts[key] += count
+
+    return HistoryFacetsResponse(
+        total=total,
+        total_duration_seconds=float(totals[0] or 0),
+        total_generation_seconds=float(totals[1] or 0),
+        favorites=favorites,
+        profiles=[
+            HistoryFacetValue(value=p.id, label=p.name, count=c, avatar_url=profile_avatar_url(p))
+            for p, c in profile_rows
+        ],
+        engines=[
+            HistoryFacetValue(value=e or "qwen", label=e or "qwen", count=c)
+            for e, c in sorted(engine_rows, key=lambda r: -r[1])
+        ],
+        languages=[
+            HistoryFacetValue(value=lang or "en", label=lang or "en", count=c)
+            for lang, c in sorted(language_rows, key=lambda r: -r[1])
+        ],
+        statuses=[HistoryFacetValue(value=k, label=k, count=v) for k, v in status_counts.items() if v],
+    )

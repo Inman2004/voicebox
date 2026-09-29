@@ -223,6 +223,143 @@ LLM_ENGINES = {
 }
 
 
+@dataclass
+class EngineParameter:
+    """A user-tunable generation parameter exposed by an engine."""
+
+    key: str
+    label: str
+    min: float
+    max: float
+    step: float
+    default: float
+    unit: str = ""
+    help: str = ""
+
+
+SPEED_PARAMETER = EngineParameter(
+    key="speed",
+    label="Speed",
+    min=0.5,
+    max=2.0,
+    step=0.05,
+    default=1.0,
+    unit="x",
+    help="Playback rate of the generated speech. 1.0 is the model's natural pace.",
+)
+
+
+@dataclass
+class EngineInfo:
+    """UI-facing metadata for a TTS engine (shared by every model size)."""
+
+    engine: str
+    display_name: str
+    tagline: str
+    description: str
+    icon: str  # lucide icon name, resolved on the frontend
+    color: str  # hex accent used for the engine badge
+    supports_cloning: bool = False
+    supports_presets: bool = False
+    supports_instruct: bool = False
+    supports_tags: bool = False
+    # True when the engine exposes a native speed control; otherwise speed
+    # is applied after synthesis with a pitch-preserving time stretch.
+    native_speed: bool = False
+    speed_rating: int = 2  # 1 (slow) .. 3 (fast), used by "Help me select"
+    quality_rating: int = 2  # 1 .. 3
+    parameters: list[EngineParameter] = field(default_factory=lambda: [SPEED_PARAMETER])
+
+
+TTS_ENGINE_INFO: dict[str, EngineInfo] = {
+    "kokoro": EngineInfo(
+        engine="kokoro",
+        display_name="Kokoro",
+        tagline="Fast multilingual voices",
+        description="Low-latency local narration with 50+ built-in voices. Runs well on CPU.",
+        icon="volume-2",
+        color="#e11d48",
+        supports_presets=True,
+        native_speed=True,
+        speed_rating=3,
+        quality_rating=2,
+    ),
+    "qwen_custom_voice": EngineInfo(
+        engine="qwen_custom_voice",
+        display_name="Qwen CustomVoice",
+        tagline="Built-in speakers with style control",
+        description="Premium preset speakers that follow natural-language delivery instructions.",
+        icon="sliders-horizontal",
+        color="#7c3aed",
+        supports_presets=True,
+        supports_instruct=True,
+        speed_rating=1,
+        quality_rating=3,
+    ),
+    "qwen": EngineInfo(
+        engine="qwen",
+        display_name="Qwen TTS",
+        tagline="High-fidelity voice cloning",
+        description="Clone any voice from a few seconds of audio across 10 languages.",
+        icon="audio-lines",
+        color="#2563eb",
+        supports_cloning=True,
+        speed_rating=1,
+        quality_rating=3,
+    ),
+    "chatterbox": EngineInfo(
+        engine="chatterbox",
+        display_name="Chatterbox Multilingual",
+        tagline="Expressive cloning in 23 languages",
+        description="Multilingual expressive speech and voice cloning.",
+        icon="sparkles",
+        color="#9333ea",
+        supports_cloning=True,
+        speed_rating=2,
+        quality_rating=3,
+    ),
+    "chatterbox_turbo": EngineInfo(
+        engine="chatterbox_turbo",
+        display_name="Chatterbox Turbo",
+        tagline="Expressive English with tags",
+        description="Expressive English speech with [laugh], [sigh] and other paralinguistic tags.",
+        icon="sparkles",
+        color="#a855f7",
+        supports_cloning=True,
+        supports_tags=True,
+        speed_rating=2,
+        quality_rating=3,
+    ),
+    "luxtts": EngineInfo(
+        engine="luxtts",
+        display_name="LuxTTS",
+        tagline="Fast, CPU-friendly cloning",
+        description="Lightweight English voice cloning that runs quickly without a GPU.",
+        icon="zap",
+        color="#0d9488",
+        supports_cloning=True,
+        native_speed=True,
+        speed_rating=3,
+        quality_rating=1,
+    ),
+    "tada": EngineInfo(
+        engine="tada",
+        display_name="TADA",
+        tagline="Long-form expressive cloning",
+        description="Hume's text-acoustic model for natural long-form narration.",
+        icon="cpu",
+        color="#ea580c",
+        supports_cloning=True,
+        speed_rating=1,
+        quality_rating=3,
+    ),
+}
+
+
+def get_engine_info(engine: str) -> Optional[EngineInfo]:
+    return TTS_ENGINE_INFO.get(engine)
+
+
 def _get_qwen_model_configs() -> list[ModelConfig]:
     """Return Qwen model configs with backend-aware HF repo IDs."""
     backend_type = get_backend_type()

@@ -135,7 +135,7 @@ export function FloatingGenerateBox({
     }
   }, [selectedProfileId, profiles, setSelectedProfileId]);
 
-  // Sync engine selection to global store so ProfileList can filter
+  // Sync engine selection to global store so the next form mount defaults to it
   const watchedEngine = form.watch('engine');
   useEffect(() => {
     if (watchedEngine) {
@@ -258,8 +258,8 @@ export function FloatingGenerateBox({
         'fixed',
         isStoriesRoute
           ? // Aligned with StoryContent: sidebar + list width + gap (tab bleeds with -mx-8)
-            'left-[calc(5rem+360px+1.5rem)] right-8'
-          : 'left-[calc(5rem+2rem)] right-8 lg:right-auto lg:w-[calc((100%-5rem-4rem)/2-1rem)]',
+            'left-[calc(var(--sidebar-width,5rem)+360px+1.5rem)] right-8'
+          : 'left-[calc(var(--sidebar-width,5rem)+2rem)] right-8 lg:right-auto lg:w-[calc((100%-var(--sidebar-width,5rem)-4rem)/2-1rem)]',
       )}
       style={{
         // On stories route: offset by track editor height when visible

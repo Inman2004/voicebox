@@ -120,6 +120,9 @@ LANG_CODE_MAP = {
     "zh": "z",
 }
 
+# Kokoro KPipeline lang codes that voice-id prefixes may select.
+_VOICE_LANG_CODES = frozenset("abefhijpz")
+
 
 class KokoroTTSBackend:
     """Kokoro-82M TTS backend — tiny, fast, CPU-friendly."""
@@ -179,9 +182,17 @@ class KokoroTTSBackend:
 
         logger.info("Kokoro-82M loaded successfully")
 
-    def _get_pipeline(self, lang_code: str):
-        """Get or create a KPipeline for the given language code."""
+    def _get_pipeline(self, lang_code: str, voice_name: Optional[str] = None):
+        """Get or create a KPipeline for the given language code.
+
+        Kokoro voice ids encode their own G2P language in the first letter
+        (``bf_emma`` → ``b`` = British English). Prefer that so British
+        voices aren't phonemized with the American dictionary.
+        """
         kokoro_lang = LANG_CODE_MAP.get(lang_code, "a")
+        if voice_name and len(voice_name) > 2 and voice_name[1] in "fm" and voice_name[2] == "_":
+            if voice_name[0] in _VOICE_LANG_CODES:
+                kokoro_lang = voice_name[0]
 
         if kokoro_lang not in self._pipelines:
             from kokoro import KPipeline
@@ -246,6 +257,7 @@ class KokoroTTSBackend:
         language: str = "en",
         seed: Optional[int] = None,
         instruct: Optional[str] = None,
+        speed: float = 1.0,
     ) -> tuple[np.ndarray, int]:
         """
         Generate audio from text using Kokoro.
@@ -272,11 +284,11 @@ class KokoroTTSBackend:
                 if torch.cuda.is_available():
                     torch.cuda.manual_seed(seed)
 
-            pipeline = self._get_pipeline(language)
+            pipeline = self._get_pipeline(language, voice_name)
 
             # Generate all chunks and concatenate
             audio_chunks = []
-            for result in pipeline(text, voice=voice_name, speed=1.0):
+            for result in pipeline(text, voice=voice_name, speed=float(speed)):
                 if result.audio is not None:
                     chunk = result.audio
                     if isinstance(chunk, torch.Tensor):

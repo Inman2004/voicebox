@@ -71,3 +71,7 @@ sse-starlette>=2.0
 # Utilities
 python-multipart>=0.0.6
 Pillow>=10.0.0
+# Generate rail: smart numbers/dates, live resource monitor
+num2words>=0.5.13
+psutil>=5.9.0
+nvidia-ml-py>=12.0.0; sys_platform != "darwin"

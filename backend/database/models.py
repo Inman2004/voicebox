@@ -43,6 +43,9 @@ class VoiceProfile(Base):
     # says and how, orthogonal to how it sounds (handled by the preset /
     # cloning metadata above).
     personality = Column(Text, nullable=True)
+    # Voice Library metadata — lets user voices filter alongside presets.
+    gender = Column(String, nullable=True)  # "male" | "female" | None
+    tags = Column(Text, nullable=True)  # JSON list of style tags
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -82,6 +85,12 @@ class Generation(Base):
     # profile's personality LLM before TTS. Future sources (bulk import,
     # agent replies, etc.) can extend this.
     source = Column(String, nullable=False, default="manual")
+    # Timing metadata: when the worker picked the job up, how long the
+    # model took to load, and how long synthesis + post-processing took.
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    load_seconds = Column(Float, nullable=True)
+    generation_seconds = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -231,7 +240,38 @@ class GenerationSettings(Base):
     crossfade_ms = Column(Integer, nullable=False, default=50)
     normalize_audio = Column(Boolean, nullable=False, default=True)
     autoplay_on_generate = Column(Boolean, nullable=False, default=True)
+    speed = Column(Float, nullable=False, default=1.0)
+    # JSON-encoded PreprocessingOptions / PostprocessingOptions. NULL means
+    # "use the schema defaults".
+    preprocessing_json = Column(Text, nullable=True)
+    postprocessing_json = Column(Text, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class GenerationPreset(Base):
+    """Saved snapshot of the generation rail (speed + pre/post-processing)."""
+
+    __tablename__ = "generation_presets"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, unique=True, nullable=False)
+    settings = Column(Text, nullable=False)  # JSON GenerationPresetSettings
+    is_builtin = Column(Boolean, default=False)
+    sort_order = Column(Integer, default=100)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class VoiceFavorite(Base):
+    """A favourited Voice Library entry.
+
+    ``key`` is ``preset:<engine>:<voice_id>`` or ``profile:<profile_id>`` so
+    built-in voices can be favourited before a profile exists for them.
+    """
+
+    __tablename__ = "voice_favorites"
+
+    key = Column(String, primary_key=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class CloudSettings(Base):

@@ -392,28 +392,6 @@
       "updateFailedFallback": "샘플 업데이트에 실패했습니다"
     }
   },
-  "profiles": {
-    "card": {
-      "noDescription": "설명 없음",
-      "designed": "디자인됨",
-      "export": "프로필 내보내기",
-      "edit": "프로필 편집",
-      "delete": "프로필 삭제",
-      "selectLabel": "{{name}}, {{language}}. 생성할 음성으로 선택하세요.",
-      "selectLabelSelected": "{{name}}, {{language}}. 생성할 음성으로 선택됨."
-    },
-    "list": {
-      "errorLoading": "프로필 로딩 오류: {{message}}",
-      "empty": "아직 음성 프로필이 없습니다. 첫 번째 프로필을 만들어 시작하세요.",
-      "createVoice": "음성 만들기",
-      "unsupportedNote": "현재 모델에서 지원되는 음성 프로필만 선택할 수 있습니다."
-    },
-    "deleteDialog": {
-      "title": "프로필 삭제",
-      "body": "\"{{name}}\"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
-      "deleting": "삭제 중…"
-    }
-  },
   "effects": {
     "title": "효과",
     "newPreset": "새 프리셋",

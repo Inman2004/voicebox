@@ -71,3 +71,58 @@ def seed_builtin_presets(SessionLocal, EffectPreset) -> None:
         db.commit()
     finally:
         db.close()
+
+
+BUILTIN_GENERATION_PRESETS = [
+    {
+        "name": "Audiobook",
+        "settings": {
+            "speed": 0.95,
+            "preprocessing": {
+                "normalize_whitespace": True,
+                "smart_numbers": True,
+                "fix_initials": True,
+                "remove_reference_numbers": True,
+                "sentence_pause_ms": 250,
+            },
+            "postprocessing": {"remove_silence": True, "loudness": "broadcast", "target_lufs": -20.0},
+        },
+    },
+    {
+        "name": "Podcast",
+        "settings": {
+            "speed": 1.05,
+            "preprocessing": {"normalize_whitespace": True, "smart_numbers": True, "fix_initials": True},
+            "postprocessing": {"remove_silence": True, "loudness": "broadcast", "target_lufs": -16.0},
+        },
+    },
+    {
+        "name": "Fast draft",
+        "settings": {
+            "speed": 1.3,
+            "preprocessing": {"normalize_whitespace": True},
+            "postprocessing": {"remove_silence": True, "loudness": "simple", "target_lufs": -16.0},
+        },
+    },
+]
+
+
+def seed_builtin_generation_presets(SessionLocal, GenerationPreset) -> None:
+    """Ensure built-in generation (rail) presets exist."""
+    db = SessionLocal()
+    try:
+        for idx, preset in enumerate(BUILTIN_GENERATION_PRESETS):
+            if db.query(GenerationPreset).filter_by(name=preset["name"]).first():
+                continue
+            db.add(
+                GenerationPreset(
+                    id=str(uuid.uuid4()),
+                    name=preset["name"],
+                    settings=json.dumps(preset["settings"]),
+                    is_builtin=True,
+                    sort_order=idx,
+                )
+            )
+        db.commit()
+    finally:
+        db.close()

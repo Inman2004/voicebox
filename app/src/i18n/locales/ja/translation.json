@@ -392,28 +392,6 @@
       "updateFailedFallback": "サンプルの更新に失敗しました"
     }
   },
-  "profiles": {
-    "card": {
-      "noDescription": "説明なし",
-      "designed": "designed",
-      "export": "プロファイルをエクスポート",
-      "edit": "プロファイルを編集",
-      "delete": "プロファイルを削除",
-      "selectLabel": "{{name}}、{{language}}。生成のボイスとして選択。",
-      "selectLabelSelected": "{{name}}、{{language}}。生成のボイスとして選択済み。"
-    },
-    "list": {
-      "errorLoading": "プロファイルの読み込みエラー:{{message}}",
-      "empty": "ボイスプロファイルがまだありません。最初のプロファイルを作成して始めましょう。",
-      "createVoice": "ボイスを作成",
-      "unsupportedNote": "現在のモデルでは、対応しているボイスプロファイルのみ選択できます。"
-    },
-    "deleteDialog": {
-      "title": "プロファイルを削除",
-      "body": "「{{name}}」を本当に削除しますか? この操作は元に戻せません。",
-      "deleting": "削除中…"
-    }
-  },
   "effects": {
     "title": "エフェクト",
     "newPreset": "新しいプリセット",

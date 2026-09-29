@@ -12,6 +12,7 @@ import type {
   GenerationResponse,
   GenerationVersionResponse,
   HealthResponse,
+  HistoryFacets,
   HistoryListResponse,
   HistoryQuery,
   HistoryResponse,
@@ -53,6 +54,11 @@ import type {
   MCPClientBindingUpsert,
   CloudLoginStartResponse,
   CloudStatus,
+  EngineInfo,
+  GenerationPreset,
+  GenerationPresetSettings,
+  LibraryVoice,
+  SystemResources,
 } from './types';
 
 function formatErrorDetail(detail: unknown, fallback: string): string {
@@ -297,17 +303,39 @@ class ApiClient {
   }
 
   // History
-  async listHistory(query?: HistoryQuery): Promise<HistoryListResponse> {
+  private historyParams(query?: HistoryQuery): string {
     const params = new URLSearchParams();
-    if (query?.profile_id) params.append('profile_id', query.profile_id);
-    if (query?.search) params.append('search', query.search);
-    if (query?.limit) params.append('limit', query.limit.toString());
-    if (query?.offset) params.append('offset', query.offset.toString());
+    for (const [key, value] of Object.entries(query ?? {})) {
+      if (value === undefined || value === null || value === '' || value === false) continue;
+      params.append(key, String(value));
+    }
+    const qs = params.toString();
+    return qs ? `?${qs}` : '';
+  }
 
-    const queryString = params.toString();
-    const endpoint = queryString ? `/history?${queryString}` : '/history';
+  async listHistory(query?: HistoryQuery): Promise<HistoryListResponse> {
+    return this.request<HistoryListResponse>(`/history${this.historyParams(query)}`);
+  }
 
-    return this.request<HistoryListResponse>(endpoint);
+  async getHistoryFacets(query?: Omit<HistoryQuery, 'limit' | 'offset'>): Promise<HistoryFacets> {
+    return this.request<HistoryFacets>(`/history/facets${this.historyParams(query)}`);
+  }
+
+  async bulkHistoryAction(ids: string[], action: 'delete' | 'favorite' | 'unfavorite'): Promise<{ affected: number }> {
+    return this.request('/history/bulk', { method: 'POST', body: JSON.stringify({ ids, action }) });
+  }
+
+  async exportHistoryZip(ids: string[]): Promise<Blob> {
+    const response = await fetch(`${this.getBaseUrl()}/history/export-zip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(formatErrorDetail(error.detail, `HTTP error! status: ${response.status}`));
+    }
+    return response.blob();
   }
 
   async getGeneration(generationId: string): Promise<HistoryResponse> {
@@ -954,6 +982,78 @@ class ApiClient {
 
   async disconnectCloud(): Promise<CloudStatus> {
     return this.request<CloudStatus>('/cloud/disconnect', { method: 'POST' });
+  }
+
+  // Engine registry — static metadata; join with getModelStatus() for state.
+  async listEngines(): Promise<EngineInfo[]> {
+    const res = await this.request<{ engines: EngineInfo[] }>('/engines');
+    return res.engines;
+  }
+
+  // Voice Library
+  async listLibraryVoices(engine?: string): Promise<LibraryVoice[]> {
+    const qs = engine ? `?engine=${encodeURIComponent(engine)}` : '';
+    const res = await this.request<{ voices: LibraryVoice[] }>(`/voices${qs}`);
+    return res.voices;
+  }
+
+  async activateVoice(engine: string, voiceId: string): Promise<{ profile_id: string; created: boolean }> {
+    return this.request('/voices/activate', {
+      method: 'POST',
+      body: JSON.stringify({ engine, voice_id: voiceId }),
+    });
+  }
+
+  async setVoiceFavorite(key: string, favorite: boolean): Promise<{ key: string; favorite: boolean }> {
+    return this.request(`/voices/favorites/${encodeURIComponent(key)}`, {
+      method: favorite ? 'PUT' : 'DELETE',
+    });
+  }
+
+  /** Absolute URL for a server-relative path such as an avatar_url. */
+  resolveUrl(path: string): string {
+    return path.startsWith('http') ? path : `${this.getBaseUrl()}${path}`;
+  }
+
+  /**
+   * Fetch a voice sample. Built-in voices are synthesized on first request
+   * (can take a few seconds), so callers should show a loading state.
+   */
+  async getVoicePreview(voice: Pick<LibraryVoice, 'engine' | 'voice_id' | 'profile_id' | 'kind'>): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (voice.kind === 'profile' && voice.profile_id) {
+      params.set('profile_id', voice.profile_id);
+    } else {
+      params.set('engine', voice.engine ?? '');
+      params.set('voice_id', voice.voice_id ?? '');
+    }
+    const response = await fetch(`${this.getBaseUrl()}/voices/preview?${params}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(formatErrorDetail(error.detail, 'Preview unavailable'));
+    }
+    return response.blob();
+  }
+
+  // Generation presets (rail snapshots)
+  async listGenerationPresets(): Promise<GenerationPreset[]> {
+    return this.request<GenerationPreset[]>('/generation-presets');
+  }
+
+  async createGenerationPreset(name: string, settings: GenerationPresetSettings): Promise<GenerationPreset> {
+    return this.request<GenerationPreset>('/generation-presets', {
+      method: 'POST',
+      body: JSON.stringify({ name, settings }),
+    });
+  }
+
+  async deleteGenerationPreset(id: string): Promise<void> {
+    await this.request(`/generation-presets/${id}`, { method: 'DELETE' });
+  }
+
+  // System resources (sidebar widget)
+  async getSystemResources(): Promise<SystemResources> {
+    return this.request<SystemResources>('/system/resources');
   }
 }
 

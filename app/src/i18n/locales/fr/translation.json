@@ -392,28 +392,6 @@
       "updateFailedFallback": "Échec de la mise à jour de l'échantillon"
     }
   },
-  "profiles": {
-    "card": {
-      "noDescription": "Aucune description",
-      "designed": "conçu pour",
-      "export": "Exporter le profil",
-      "edit": "Modifier le profil",
-      "delete": "Supprimer le profil",
-      "selectLabel": "{{name}}, {{language}}. Sélectionnez comme voix pour la génération.",
-      "selectLabelSelected": "{{name}}, {{language}}. Sélectionné comme voix pour la génération."
-    },
-    "list": {
-      "errorLoading": "Erreur lors du chargement des profils : {{message}}",
-      "empty": "Encore aucun profil vocal. Créez votre premier profil pour commencer.",
-      "createVoice": "Créer une voix",
-      "unsupportedNote": "Seuls les profils vocaux pris en charge peuvent être sélectionnés pour le modèle actuel."
-    },
-    "deleteDialog": {
-      "title": "Supprimer le profil",
-      "body": "Êtes-vous sûr de vouloir supprimer \"{{name}}\" ? Cette action est irréversible.",
-      "deleting": "Suppression…"
-    }
-  },
   "effects": {
     "title": "Effets",
     "newPreset": "Nouveau préréglage",

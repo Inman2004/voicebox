@@ -14,6 +14,7 @@ from .models import (
     CloudSettings,
     EffectPreset,
     Generation,
+    GenerationPreset,
     GenerationSettings,
     GenerationVersion,
     MCPClientBinding,
@@ -22,6 +23,7 @@ from .models import (
     Project,
     Story,
     StoryItem,
+    VoiceFavorite,
     VoiceProfile,
 )
 from .session import engine, SessionLocal, _db_path, init_db, get_db
@@ -36,6 +38,7 @@ __all__ = [
     "CloudSettings",
     "EffectPreset",
     "Generation",
+    "GenerationPreset",
     "GenerationSettings",
     "GenerationVersion",
     "MCPClientBinding",
@@ -44,6 +47,7 @@ __all__ = [
     "Project",
     "Story",
     "StoryItem",
+    "VoiceFavorite",
     "VoiceProfile",
     # Session
     "engine",

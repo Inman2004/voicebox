@@ -1,158 +1,134 @@
-import { Sparkles, Upload } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
+import { History, Images, PanelRightClose, PanelRightOpen, X } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FloatingGenerateBox } from '@/components/Generation/FloatingGenerateBox';
+import { ModelSection } from '@/components/Generate/Rail/ModelSection';
+import { ParametersSection } from '@/components/Generate/Rail/ParametersSection';
+import { PostProcessingSection } from '@/components/Generate/Rail/PostProcessingSection';
+import { TextPreprocessingSection } from '@/components/Generate/Rail/TextPreprocessingSection';
+import { VoiceSection } from '@/components/Generate/Rail/VoiceSection';
+import { ResultPanel } from '@/components/Generate/ResultPanel';
+import { TextEditor } from '@/components/Generate/TextEditor';
+import { GenerateSessionProvider, useSession } from '@/components/Generate/useGenerateSession';
 import { HistoryTable } from '@/components/History/HistoryTable';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { useToast } from '@/components/ui/use-toast';
-import { ProfileList } from '@/components/VoiceProfiles/ProfileList';
-
-import { useImportProfile } from '@/lib/hooks/useProfiles';
+import { ProfileForm } from '@/components/VoiceProfiles/ProfileForm';
+import { apiClient } from '@/lib/api/client';
+import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { useProfile } from '@/lib/hooks/useProfiles';
 import { cn } from '@/lib/utils/cn';
 import { usePlayerStore } from '@/stores/playerStore';
-import { useUIStore } from '@/stores/uiStore';
 
 export function MainEditor() {
+  return (
+    <GenerateSessionProvider>
+      <GenerateScreen />
+    </GenerateSessionProvider>
+  );
+}
+
+function GenerateScreen() {
   const { t } = useTranslation();
-  const audioUrl = usePlayerStore((state) => state.audioUrl);
-  const isPlayerVisible = !!audioUrl;
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const setDialogOpen = useUIStore((state) => state.setProfileDialogOpen);
-  const importProfile = useImportProfile();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const { toast } = useToast();
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.name.endsWith('.voicebox.zip')) {
-        toast({
-          title: t('main.import.invalidTitle'),
-          description: t('main.import.invalidDescription'),
-          variant: 'destructive',
-        });
-        return;
-      }
-      setSelectedFile(file);
-      setImportDialogOpen(true);
-    }
-  };
-
-  const handleImportConfirm = () => {
-    if (selectedFile) {
-      importProfile.mutate(selectedFile, {
-        onSuccess: () => {
-          setImportDialogOpen(false);
-          setSelectedFile(null);
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-          toast({
-            title: t('main.import.successTitle'),
-            description: t('main.import.successDescription'),
-          });
-        },
-        onError: (error) => {
-          toast({
-            title: t('main.import.failedTitle'),
-            description: error.message,
-            variant: 'destructive',
-          });
-        },
-      });
-    }
-  };
+  const isPlayerVisible = !!usePlayerStore((state) => state.audioUrl);
+  const { selectedVoice } = useSession();
+  const { data: profile } = useProfile(selectedVoice?.profile_id ?? '');
+  const { data: effectPresets } = useQuery({
+    queryKey: ['effectPresets'],
+    queryFn: () => apiClient.listEffectPresets(),
+  });
+  const [lastGenerationId, setLastGenerationId] = useState<string | null>(null);
+  // Wide windows always show the rail; narrower ones toggle it over the editor.
+  const wide = useMediaQuery('(min-width: 1280px)');
+  const [railToggled, setRailToggled] = useState(false);
+  const railOpen = wide || railToggled;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-6 h-full min-h-0 overflow-hidden relative">
-      <div className="flex flex-col min-h-0 overflow-hidden relative lg:overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-background to-transparent z-0 pointer-events-none" />
-
-        <div className="absolute top-0 left-0 right-0 z-10">
-          <div className="flex items-center justify-between mb-4 px-1">
-            <h2 className="text-2xl font-bold">Voicebox</h2>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleImportClick}>
-                <Upload className="mr-2 h-4 w-4" />
-                {t('main.importVoice')}
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".voicebox.zip"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <Button onClick={() => setDialogOpen(true)}>
-                <Sparkles className="mr-2 h-4 w-4" />
-                {t('main.createVoice')}
-              </Button>
-            </div>
-          </div>
+    <div className="relative flex h-full min-h-0 gap-6 overflow-hidden pt-4">
+      {/* Center: editor, live result, history */}
+      <div
+        className={cn(
+          'flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto pb-6 pr-1',
+          isPlayerVisible && BOTTOM_SAFE_AREA_PADDING,
+        )}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">{t('generate.title')}</h2>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 xl:hidden"
+            onClick={() => setRailToggled((o) => !o)}
+            aria-label={railOpen ? t('generate.hideSettings') : t('generate.showSettings')}
+          >
+            {railOpen ? <PanelRightClose /> : <PanelRightOpen />}
+          </Button>
         </div>
 
-        <div
-          ref={scrollRef}
-          className={cn('flex-1 min-h-0 overflow-y-auto pt-14 pb-4', isPlayerVisible && 'lg:pb-32')}
-        >
-          <div className="flex flex-col gap-6">
-            <div className="shrink-0 flex flex-col">
-              <ProfileList />
-            </div>
+        <TextEditor
+          profile={profile}
+          effectPresets={effectPresets}
+          onGenerated={setLastGenerationId}
+        />
+        <ResultPanel generationId={lastGenerationId} />
+
+        <section className="flex h-[65vh] min-h-[420px] shrink-0 flex-col">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+              <History className="h-4 w-4" />
+              {t('generate.history')}
+            </h3>
+            <Link
+              to="/gallery"
+              className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Images className="h-3.5 w-3.5" />
+              {t('generate.openGallery')}
+            </Link>
           </div>
-        </div>
+          <div className="flex min-h-0 flex-1 flex-col">
+            <HistoryTable />
+          </div>
+        </section>
       </div>
 
-      <div className="flex flex-col min-h-0 overflow-hidden">
-        <HistoryTable />
-      </div>
-
-      <FloatingGenerateBox isPlayerOpen={!!audioUrl} />
-
-      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('main.import.dialogTitle')}</DialogTitle>
-            <DialogDescription>
-              {t('main.import.dialogDescription', { name: selectedFile?.name })}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
+      {/* Right: settings rail */}
+      <aside
+        className={cn(
+          'w-[340px] shrink-0 flex-col gap-4 overflow-y-auto pb-6 pr-1',
+          railOpen ? 'flex' : 'hidden',
+          // Below xl the rail overlays the editor instead of squeezing it.
+          !wide &&
+            'absolute right-0 top-4 bottom-0 z-20 rounded-l-2xl bg-background/95 pl-3 shadow-2xl backdrop-blur',
+          isPlayerVisible && BOTTOM_SAFE_AREA_PADDING,
+        )}
+        aria-label={t('generate.settings')}
+      >
+        {!wide && (
+          <div className="sticky top-0 z-10 -mb-2 flex items-center justify-between bg-background/95 py-1">
+            <span className="text-sm font-semibold">{t('generate.settings')}</span>
             <Button
-              variant="outline"
-              onClick={() => {
-                setImportDialogOpen(false);
-                setSelectedFile(null);
-                if (fileInputRef.current) {
-                  fileInputRef.current.value = '';
-                }
-              }}
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setRailToggled(false)}
+              aria-label={t('generate.hideSettings')}
             >
-              {t('common.cancel')}
+              <X />
             </Button>
-            <Button
-              onClick={handleImportConfirm}
-              disabled={importProfile.isPending || !selectedFile}
-            >
-              {importProfile.isPending ? t('main.import.importing') : t('main.import.action')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        )}
+        <ModelSection />
+        <VoiceSection />
+        <ParametersSection />
+        <PostProcessingSection hasProfileEffects={!!profile?.effects_chain?.length} />
+        <TextPreprocessingSection />
+      </aside>
+
+      <ProfileForm />
     </div>
   );
 }

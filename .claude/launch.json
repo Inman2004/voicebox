@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "dev:web", "--", "--port", "5173", "--strictPort"],
+      "port": 5173
+    },
+    {
+      "name": "backend-e2e",
+      "runtimeExecutable": "C:/Users/rvimm/AppData/Local/Temp/claude/C--dev-projects-voicebox/a7a26536-e202-4303-a0f7-cf75c4a405f0/scratchpad/e2e312/Scripts/python.exe",
+      "runtimeArgs": ["-m", "backend.main", "--host", "127.0.0.1", "--port", "17493", "--data-dir", "C:/Users/rvimm/AppData/Local/Temp/claude/C--dev-projects-voicebox/a7a26536-e202-4303-a0f7-cf75c4a405f0/scratchpad/e2e-data"],
+      "port": 17493
+    }
+  ]
+}

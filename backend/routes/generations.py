@@ -49,6 +49,11 @@ def _get_or_create_import_profile(db: Session) -> DBVoiceProfile:
     return row
 
 
+def _iso(value) -> str | None:
+    # Stored as naive UTC; mark it so browsers don't parse it as local time.
+    return value.isoformat() + "Z" if value is not None else None
+
+
 def _resolve_generation_engine(data: models.GenerationRequest, profile) -> str:
     return data.engine or getattr(profile, "default_engine", None) or getattr(profile, "preset_engine", None) or "qwen"
 
@@ -123,6 +128,10 @@ async def generate_speech(
             except Exception:
                 pass
 
+    from ..services.settings import resolve_generation_options
+
+    speed, preprocessing, postprocessing = resolve_generation_options(data, db)
+
     enqueue_generation(
         generation_id,
         run_generation(
@@ -139,6 +148,9 @@ async def generate_speech(
             mode="generate",
             max_chunk_chars=data.max_chunk_chars,
             crossfade_ms=data.crossfade_ms,
+            speed=speed,
+            preprocessing=preprocessing,
+            postprocessing=postprocessing,
         )
     )
 
@@ -294,6 +306,12 @@ async def get_generation_status(generation_id: str, db: Session = Depends(get_db
                     # Agent-originated sources ("mcp", "rest") skip main-window
                     # autoplay — the floating pill plays those directly.
                     "source": gen.source,
+                    # Timing for the live elapsed counter / "generated in" badge
+                    "created_at": _iso(gen.created_at),
+                    "started_at": _iso(gen.started_at),
+                    "completed_at": _iso(gen.completed_at),
+                    "load_seconds": gen.load_seconds,
+                    "generation_seconds": gen.generation_seconds,
                 }
                 yield f"data: {json.dumps(payload)}\n\n"
 
@@ -322,12 +340,12 @@ async def stream_speech(
 ):
     """Generate speech and stream the WAV audio directly without saving to disk."""
     from ..backends import (
-        engine_needs_trim,
-        engine_retries_runaway,
         ensure_model_cached_or_raise,
         get_tts_backend_for_engine,
         load_engine_model,
     )
+    from ..services.render import render_speech
+    from ..services.settings import resolve_generation_options
 
     profile = await profiles.get_profile(data.profile_id, db)
     if not profile:
@@ -350,31 +368,24 @@ async def stream_speech(
         engine=engine,
     )
 
-    from ..utils.chunked_tts import generate_chunked
-
-    trim_fn = None
-    runaway_detector = None
-    if engine_needs_trim(engine):
-        from ..utils.audio import trim_tts_output
-
-        trim_fn = trim_tts_output
-    if engine_retries_runaway(engine):
-        from ..utils.audio import has_tts_runaway
-
-        runaway_detector = has_tts_runaway
-
-    audio, sample_rate = await generate_chunked(
-        tts_model,
-        data.text,
-        voice_prompt,
-        language=data.language,
-        seed=data.seed,
-        instruct=data.instruct,
-        max_chunk_chars=data.max_chunk_chars,
-        crossfade_ms=data.crossfade_ms,
-        trim_fn=trim_fn,
-        runaway_detector=runaway_detector,
-    )
+    speed, preprocessing, postprocessing = resolve_generation_options(data, db)
+    try:
+        audio, sample_rate = await render_speech(
+            tts_model,
+            engine=engine,
+            text=data.text,
+            voice_prompt=voice_prompt,
+            language=data.language,
+            seed=data.seed,
+            instruct=data.instruct,
+            max_chunk_chars=data.max_chunk_chars,
+            crossfade_ms=data.crossfade_ms,
+            speed=speed,
+            preprocessing=preprocessing,
+            postprocessing=postprocessing,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     effects_chain_config = None
     if data.effects_chain is not None:
@@ -387,15 +398,11 @@ async def stream_speech(
         except Exception:
             effects_chain_config = None
 
+    # Same order as /generate: loudness (inside render_speech) then effects.
     if effects_chain_config:
         from ..utils.effects import apply_effects
 
         audio = apply_effects(audio, sample_rate, effects_chain_config)
-
-    if data.normalize:
-        from ..utils.audio import normalize_audio
-
-        audio = normalize_audio(audio)
 
     wav_bytes = tts.audio_to_wav_bytes(audio, sample_rate)
 

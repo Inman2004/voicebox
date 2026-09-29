@@ -138,6 +138,20 @@ def build_server(cuda=False, rocm=False):
             "backend.services.versions",
             "--hidden-import",
             "pedalboard",
+            # Generate rail: resource monitor + smart-number preprocessing.
+            # num2words imports its per-language modules dynamically.
+            "--hidden-import",
+            "psutil",
+            "--hidden-import",
+            "pynvml",
+            "--collect-submodules",
+            "num2words",
+            # Bundled avatars for built-in voices (services/voice_catalog.py)
+            "--add-data",
+            f"voices{os.sep}avatars{os.pathsep}backend{os.sep}voices{os.sep}avatars",
+            # Bundled preview clips for built-in voices
+            "--add-data",
+            f"voices{os.sep}samples{os.pathsep}backend{os.sep}voices{os.sep}samples",
             "--hidden-import",
             "chatterbox",
             "--hidden-import",

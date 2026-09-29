@@ -392,28 +392,6 @@
       "updateFailedFallback": "Error al actualizar la muestra"
     }
   },
-  "profiles": {
-    "card": {
-      "noDescription": "Sin descripción",
-      "designed": "diseñada",
-      "export": "Exportar perfil",
-      "edit": "Editar perfil",
-      "delete": "Eliminar perfil",
-      "selectLabel": "{{name}}, {{language}}. Seleccionar como voz para la generación.",
-      "selectLabelSelected": "{{name}}, {{language}}. Seleccionada como voz para la generación."
-    },
-    "list": {
-      "errorLoading": "Error al cargar los perfiles: {{message}}",
-      "empty": "Aún no hay perfiles de voz. Crea tu primer perfil para empezar.",
-      "createVoice": "Crear voz",
-      "unsupportedNote": "Solo se pueden seleccionar los perfiles de voz compatibles con el modelo actual."
-    },
-    "deleteDialog": {
-      "title": "Eliminar perfil",
-      "body": "¿Seguro que quieres eliminar \"{{name}}\"? Esta acción no se puede deshacer.",
-      "deleting": "Eliminando…"
-    }
-  },
   "effects": {
     "title": "Efectos",
     "newPreset": "Nuevo preajuste",

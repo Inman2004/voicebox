@@ -32,6 +32,11 @@ interface UIStore {
   // Sidebar
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
+  /** Icon-only rail instead of the labelled sidebar. */
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  resourcesExpanded: boolean;
+  setResourcesExpanded: (expanded: boolean) => void;
 
   // Modals
   profileDialogOpen: boolean;
@@ -68,6 +73,10 @@ export const useUIStore = create<UIStore>()(
     (set) => ({
       sidebarOpen: true,
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
+      sidebarCollapsed: false,
+      setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+      resourcesExpanded: true,
+      setResourcesExpanded: (expanded) => set({ resourcesExpanded: expanded }),
 
       profileDialogOpen: false,
       setProfileDialogOpen: (open) => set({ profileDialogOpen: open }),
@@ -100,6 +109,8 @@ export const useUIStore = create<UIStore>()(
       partialize: (state) => ({
         selectedProfileId: state.selectedProfileId,
         theme: state.theme,
+        sidebarCollapsed: state.sidebarCollapsed,
+        resourcesExpanded: state.resourcesExpanded,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) applyTheme(state.theme);

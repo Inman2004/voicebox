@@ -43,6 +43,7 @@ def run_migrations(engine) -> None:
     _migrate_generation_versions(engine, inspector, tables)
     _migrate_capture_settings(engine, inspector, tables)
     _migrate_mcp_bindings(engine, inspector, tables)
+    _migrate_generation_settings(engine, inspector, tables)
     _normalize_storage_paths(engine, tables)
 
 
@@ -61,6 +62,19 @@ def _add_column(engine, table: str, column_sql: str, label: str) -> None:
 
 
 # -- per-table migrations --------------------------------------------------
+
+def _migrate_generation_settings(engine, inspector, tables: set[str]) -> None:
+    """Speed + text/audio processing defaults for the Generate rail."""
+    if "generation_settings" not in tables:
+        return
+    columns = _get_columns(inspector, "generation_settings")
+    if "speed" not in columns:
+        _add_column(engine, "generation_settings", "speed FLOAT NOT NULL DEFAULT 1.0", "speed")
+    if "preprocessing_json" not in columns:
+        _add_column(engine, "generation_settings", "preprocessing_json TEXT", "preprocessing_json")
+    if "postprocessing_json" not in columns:
+        _add_column(engine, "generation_settings", "postprocessing_json TEXT", "postprocessing_json")
+
 
 def _migrate_story_items(engine, inspector, tables: set[str]) -> None:
     if "story_items" not in tables:
@@ -151,6 +165,11 @@ def _migrate_profiles(engine, inspector, tables: set[str]) -> None:
         _add_column(engine, "profiles", "voice_type VARCHAR DEFAULT 'cloned'", "voice_type")
     if "preset_engine" not in columns:
         _add_column(engine, "profiles", "preset_engine VARCHAR", "preset_engine")
+    # Voice Library metadata
+    if "gender" not in columns:
+        _add_column(engine, "profiles", "gender VARCHAR", "gender")
+    if "tags" not in columns:
+        _add_column(engine, "profiles", "tags TEXT", "tags")
     if "preset_voice_id" not in columns:
         _add_column(engine, "profiles", "preset_voice_id VARCHAR", "preset_voice_id")
     if "design_prompt" not in columns:
@@ -184,6 +203,14 @@ def _migrate_generations(engine, inspector, tables: set[str]) -> None:
             "source VARCHAR NOT NULL DEFAULT 'manual'",
             "source",
         )
+    for column_sql, label in (
+        ("started_at DATETIME", "started_at"),
+        ("completed_at DATETIME", "completed_at"),
+        ("load_seconds FLOAT", "load_seconds"),
+        ("generation_seconds FLOAT", "generation_seconds"),
+    ):
+        if label not in columns:
+            _add_column(engine, "generations", column_sql, label)
 
 
 def _migrate_effect_presets(engine, inspector, tables: set[str]) -> None:

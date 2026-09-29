@@ -25,7 +25,7 @@ async def update_capture_settings_endpoint(
 
 @router.get("/generation", response_model=models.GenerationSettingsResponse)
 async def get_generation_settings_endpoint(db: Session = Depends(get_db)):
-    return settings_service.get_generation_settings(db)
+    return settings_service.generation_settings_to_response(settings_service.get_generation_settings(db))
 
 
 @router.put("/generation", response_model=models.GenerationSettingsResponse)
@@ -33,4 +33,5 @@ async def update_generation_settings_endpoint(
     patch: models.GenerationSettingsUpdate,
     db: Session = Depends(get_db),
 ):
-    return settings_service.update_generation_settings(db, patch.model_dump(exclude_unset=True))
+    row = settings_service.update_generation_settings_from_request(db, patch)
+    return settings_service.generation_settings_to_response(row)

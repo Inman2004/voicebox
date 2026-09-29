@@ -3,12 +3,10 @@ import { useEffect, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api/client';
 import { useGenerationSettings } from '@/lib/hooks/useSettings';
-import { useGenerationStore } from '@/stores/generationStore';
+import { type LiveGenerationStatus, useGenerationStore } from '@/stores/generationStore';
 import { usePlayerStore } from '@/stores/playerStore';
 
-interface GenerationStatusEvent {
-  id: string;
-  status: 'loading_model' | 'generating' | 'completed' | 'failed' | 'not_found';
+interface GenerationStatusEvent extends LiveGenerationStatus {
   duration?: number;
   error?: string;
   source?: string;
@@ -29,6 +27,7 @@ export function useGenerationProgress() {
   const pendingIds = useGenerationStore((s) => s.pendingGenerationIds);
   const removePendingGeneration = useGenerationStore((s) => s.removePendingGeneration);
   const removePendingStoryAdd = useGenerationStore((s) => s.removePendingStoryAdd);
+  const setLiveStatus = useGenerationStore((s) => s.setLiveStatus);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const setAudioWithAutoPlay = usePlayerStore((s) => s.setAudioWithAutoPlay);
   const { settings: genSettings } = useGenerationSettings();
@@ -75,6 +74,7 @@ export function useGenerationProgress() {
       source.onmessage = (event) => {
         try {
           const data: GenerationStatusEvent = JSON.parse(event.data);
+          setLiveStatus(data);
 
           if (data.status === 'completed') {
             source.close();
@@ -157,6 +157,7 @@ export function useGenerationProgress() {
     pendingIds,
     removePendingGeneration,
     removePendingStoryAdd,
+    setLiveStatus,
     queryClient,
     toast,
     setAudioWithAutoPlay,

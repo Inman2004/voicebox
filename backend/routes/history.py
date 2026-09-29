@@ -14,22 +14,105 @@ from ..database import Generation as DBGeneration, VoiceProfile as DBVoiceProfil
 router = APIRouter()
 
 
-@router.get("/history", response_model=models.HistoryListResponse)
-async def list_history(
+def _history_query(
     profile_id: str | None = None,
     search: str | None = None,
+    engine: str | None = None,
+    language: str | None = None,
+    status: str | None = None,
+    favorites_only: bool = False,
+    sort_by: str = "created_at",
+    order: str = "desc",
+    group_by: str = "none",
     limit: int = 50,
     offset: int = 0,
+) -> models.HistoryQuery:
+    from pydantic import ValidationError
+
+    try:
+        return models.HistoryQuery(
+            profile_id=profile_id,
+            search=search,
+            engine=engine,
+            language=language,
+            status=status,
+            favorites_only=favorites_only,
+            sort_by=sort_by,
+            order=order,
+            group_by=group_by,
+            limit=limit,
+            offset=offset,
+        )
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=e.errors()) from e
+
+
+@router.get("/history", response_model=models.HistoryListResponse)
+async def list_history(
+    query: models.HistoryQuery = Depends(_history_query),
     db: Session = Depends(get_db),
 ):
-    """List generation history with optional filters."""
-    query = models.HistoryQuery(
-        profile_id=profile_id,
-        search=search,
-        limit=limit,
-        offset=offset,
-    )
+    """List generation history with filters, sorting and group ordering."""
     return await history.list_generations(query, db)
+
+
+@router.get("/history/facets", response_model=models.HistoryFacetsResponse)
+async def get_history_facets(
+    query: models.HistoryQuery = Depends(_history_query),
+    db: Session = Depends(get_db),
+):
+    """Filter counts and totals for the Gallery."""
+    return await history.get_history_facets(query, db)
+
+
+@router.post("/history/bulk", response_model=models.HistoryBulkResponse)
+async def bulk_history_action(data: models.HistoryBulkRequest, db: Session = Depends(get_db)):
+    """Favourite, unfavourite or delete many generations at once."""
+    ids = list(dict.fromkeys(data.ids))
+    if data.action == "delete":
+        affected = 0
+        for generation_id in ids:
+            if await history.delete_generation(generation_id, db):
+                affected += 1
+        return models.HistoryBulkResponse(affected=affected)
+
+    rows = db.query(DBGeneration).filter(DBGeneration.id.in_(ids)).all()
+    for row in rows:
+        row.is_favorited = data.action == "favorite"
+    db.commit()
+    return models.HistoryBulkResponse(affected=len(rows))
+
+
+@router.post("/history/export-zip")
+async def export_history_zip(data: models.HistoryExportZipRequest, db: Session = Depends(get_db)):
+    """Download the active audio of several generations as one ZIP."""
+    import zipfile
+
+    rows = db.query(DBGeneration).filter(DBGeneration.id.in_(list(dict.fromkeys(data.ids)))).all()
+    buffer = io.BytesIO()
+    written = 0
+    used_names: set[str] = set()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_STORED) as zf:  # WAV doesn't compress well
+        for gen in sorted(rows, key=lambda g: g.created_at or 0):
+            audio_path = config.resolve_storage_path(gen.audio_path) if gen.audio_path else None
+            if audio_path is None or not audio_path.is_file():
+                continue
+            safe_text = "".join(c for c in gen.text[:30] if c.isalnum() or c in (" ", "-", "_")).strip() or "generation"
+            name = f"{safe_text}-{gen.id[:8]}{audio_path.suffix or '.wav'}"
+            if name in used_names:
+                name = f"{safe_text}-{gen.id}{audio_path.suffix or '.wav'}"
+            used_names.add(name)
+            zf.write(audio_path, arcname=name)
+            written += 1
+    if written == 0:
+        raise HTTPException(status_code=404, detail="None of the selected generations have audio")
+
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": safe_content_disposition("attachment", f"voicebox-{written}-clips.zip")},
+    )
 
 
 @router.get("/history/stats")
@@ -101,6 +184,10 @@ async def get_generation(
         status=gen.status or "completed",
         error=gen.error,
         is_favorited=bool(gen.is_favorited),
+        started_at=gen.started_at,
+        completed_at=gen.completed_at,
+        load_seconds=gen.load_seconds,
+        generation_seconds=gen.generation_seconds,
         created_at=gen.created_at,
     )
 
