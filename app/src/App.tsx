@@ -1,15 +1,14 @@
 import { RouterProvider } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
-import voiceboxLogo from '@/assets/voicebox-logo.png';
+import voiceboxLogo from '@/assets/magicvox-logo.png';
 import { DictateWindow } from '@/components/DictateWindow/DictateWindow';
 import ShinyText from '@/components/ShinyText';
 import { TitleBarDragRegion } from '@/components/TitleBarDragRegion';
-import { useAutoUpdater } from '@/hooks/useAutoUpdater';
 import { useThemeSync } from '@/hooks/useThemeSync';
 import { apiClient } from '@/lib/api/client';
 import type { HealthResponse } from '@/lib/api/types';
-import { useChordSync } from '@/lib/hooks/useChordSync';
 import { TOP_SAFE_AREA_PADDING } from '@/lib/constants/ui';
+import { useChordSync } from '@/lib/hooks/useChordSync';
 import { cn } from '@/lib/utils/cn';
 import { usePlatform } from '@/platform/PlatformContext';
 import { router } from '@/router';
@@ -96,7 +95,8 @@ function MainApp() {
   const serverStartingRef = useRef(false);
 
   // Automatically check for app updates on startup and show toast notifications
-  useAutoUpdater({ checkOnMount: true, showToast: true });
+  // Auto-update is off until MagicVox has its own release channel (the
+  // configured one is the original Voicebox project's GitHub releases).
 
   // Replay the saved chord into the Rust hotkey listener every time
   // capture_settings resolves or the user edits the chord.
@@ -265,7 +265,7 @@ function MainApp() {
             </div>
             <img
               src={voiceboxLogo}
-              alt="Voicebox"
+              alt="MagicVox"
               className="w-48 h-48 object-contain animate-fade-in-scale relative z-10"
             />
           </div>

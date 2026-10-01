@@ -26,6 +26,7 @@ from .. import config
 from . import history, profiles
 from ..database import get_db
 from ..utils.tasks import get_task_manager
+from . import inference_runtime as runtime
 
 
 class _OptionsRequest:
@@ -38,6 +39,7 @@ class _OptionsRequest:
         self.normalize = normalize
 
 
+@runtime.qwen_job
 async def run_generation(
     *,
     generation_id: str,
@@ -123,6 +125,8 @@ async def run_generation(
 
         duration = len(audio) / sample_rate
         generation_seconds = time.perf_counter() - t_synth
+        if engine == "qwen_custom_voice":
+            runtime.publish(stage="saving", generation_seconds=generation_seconds, audio_seconds=duration)
 
         # --- Persist audio and update status -----------------------------
         if mode == "generate":
@@ -181,6 +185,14 @@ async def run_generation(
     else:
         _notify_speak_end(generation_id, status="completed")
     finally:
+        if engine == "qwen_custom_voice":
+            from ..database import Generation
+
+            row = bg_db.query(Generation).filter_by(id=generation_id).first()
+            if row:
+                runtime.publish(stage="completed" if row.status == "completed" else "failed", active=False)
+                row.diagnostics = runtime.snapshot(generation_id)
+                bg_db.commit()
         task_manager.complete_generation(generation_id)
         bg_db.close()
 
@@ -276,6 +288,7 @@ def _save_retry(
     return config.to_storage_path(audio_path)
 
 
+@runtime.qwen_job
 async def generate_audio_sync(
     *,
     profile_id: str,

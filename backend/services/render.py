@@ -22,6 +22,17 @@ logger = logging.getLogger("voicebox.render")
 _SEGMENT_SEED_STRIDE = 1000
 
 
+from .inference_runtime import qwen_job
+
+
+@qwen_job
+async def render_request(backend, *, engine, model_size, **kwargs):
+    """Non-persisting request boundary with an immutable execution snapshot."""
+    from ..backends import load_engine_model
+    await load_engine_model(engine, model_size)
+    return await render_speech(backend, engine=engine, **kwargs)
+
+
 async def render_speech(
     backend,
     *,
@@ -105,5 +116,8 @@ async def render_speech(
         ]
         audio = concatenate_audio_chunks(pieces, sample_rate, crossfade_ms=0)
 
+    if engine == "qwen_custom_voice":
+        from .inference_runtime import publish
+        publish(stage="postprocessing")
     audio = apply_postprocessing(audio, sample_rate, postprocessing)
     return audio, sample_rate

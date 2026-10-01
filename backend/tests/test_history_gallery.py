@@ -152,3 +152,62 @@ def test_export_zip_skips_rows_without_audio(env):
 def test_invalid_sort_is_rejected(env):
     client, _ = env
     assert client.get("/history", params={"sort_by": "drop table"}).status_code == 422
+
+
+def test_sort_by_file_size_and_group_by_length(env):
+    from backend import config
+    from backend.database import Generation, session
+
+    client, ids = env
+    # Give each completed file a different size, then let the startup backfill record them.
+    db = session.SessionLocal()
+    for n, gid in zip((16000, 1600, 64000), (ids[0], ids[1], ids[2])):
+        row = db.query(Generation).filter_by(id=gid).first()
+        sf.write(config.resolve_storage_path(row.audio_path), np.zeros(n, dtype=np.float32), 16000)
+        row.file_size = None
+    db.commit()
+    db.close()
+    session._backfill_file_sizes()
+
+    items = client.get("/history", params={"sort_by": "file_size", "order": "desc", "status": "completed"}).json()["items"]
+    assert [g["text"] for g in items] == ["Hola mundo", "Short hello", "A much longer sentence here"]
+    assert items[0]["file_size"] > items[1]["file_size"] > items[2]["file_size"]
+
+    # Length groups run longest first: 9 s and 3 s and 1 s are all "under 30 s",
+    # so the grouping keeps the requested duration order inside the bucket.
+    grouped = _texts(client, group_by="length", sort_by="duration", order="desc", status="completed")
+    assert grouped == ["A much longer sentence here", "Hola mundo", "Short hello"]
+
+
+def test_output_folder_setting(tmp_path):
+    from backend import config
+    from backend.database import session
+
+    config.set_data_dir(tmp_path / "data")
+    session.init_db()
+    import backend.app  # noqa: F401
+    from backend.routes import settings
+
+    app = FastAPI()
+    app.include_router(settings.router)
+    client = TestClient(app)
+    try:
+        custom = tmp_path / "My Outputs"
+        res = client.put("/settings/generation", json={"output_dir": str(custom)})
+        assert res.status_code == 200
+        body = res.json()
+        assert body["output_dir"] == str(custom.resolve())
+        assert body["effective_output_dir"] == str(custom.resolve())
+        assert config.get_generations_dir() == custom.resolve()
+        # Files there are stored as absolute paths and resolve back to themselves.
+        wav = custom / "x.wav"
+        wav.write_bytes(b"RIFF")
+        assert config.resolve_storage_path(config.to_storage_path(wav)) == wav.resolve()
+
+        assert client.put("/settings/generation", json={"output_dir": "relative/folder"}).status_code == 400
+
+        reset = client.put("/settings/generation", json={"output_dir": ""}).json()
+        assert reset["output_dir"] is None
+        assert reset["effective_output_dir"] == reset["default_output_dir"]
+    finally:
+        config.set_generations_dir(None)

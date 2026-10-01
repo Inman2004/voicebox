@@ -109,3 +109,20 @@ def test_builtin_presets_are_protected(client):
 def test_system_resources_shape(client):
     data = client.get("/system/resources").json()
     assert "cpu_percent" in data and "loaded_models" in data
+
+
+def test_defaults_match_the_first_fast_decode_configuration(client):
+    res = client.get("/settings/generation").json()
+    assert res["postprocessing"]["loudness"] == "broadcast"
+    assert res["postprocessing"]["target_lufs"] == -16
+    assert res["postprocessing"]["remove_silence"] is False
+    assert res["speed"] == 1.0
+    assert res["qwen_execution"]["fast_decode"] is True
+    assert res["qwen_execution"]["efficient_attention"] is False
+
+
+def test_legacy_normalize_toggle_restores_broadcast_without_losing_target(client):
+    client.put("/settings/generation", json={"postprocessing": {"loudness": "off", "target_lufs": -18}})
+    res = client.put("/settings/generation", json={"normalize_audio": True}).json()
+    assert res["postprocessing"]["loudness"] == "broadcast"
+    assert res["postprocessing"]["target_lufs"] == -18

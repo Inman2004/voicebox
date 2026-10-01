@@ -4,6 +4,7 @@ import { SimpleTooltip } from '@/components/ui/tooltip';
 import { useSystemResources } from '@/lib/hooks/useSystemResources';
 import { cn } from '@/lib/utils/cn';
 import { useUIStore } from '@/stores/uiStore';
+import { InferenceDiagnostics } from './InferenceDiagnostics';
 
 function formatMb(mb?: number | null) {
   if (mb == null) return '—';
@@ -60,6 +61,7 @@ export function ResourcesWidget({ collapsed }: { collapsed: boolean }) {
             <p>RAM {formatMb(data?.app_ram_mb)}</p>
             <p>VRAM {formatMb(data?.vram_used_mb)}</p>
             <p>{model}</p>
+            <p>{data?.inference?.actual ?? t('inference.unverified', 'Not verified')}</p>
           </div>
         }
       >
@@ -129,6 +131,7 @@ export function ResourcesWidget({ collapsed }: { collapsed: boolean }) {
                   <Row label={t('sidebar.resources.model')} value={model} />
                 </div>
               </SimpleTooltip>
+              <InferenceDiagnostics data={data?.inference} />
             </>
           )}
         </div>

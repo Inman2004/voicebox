@@ -139,13 +139,13 @@
       },
       "inputMonitoring": {
         "label": "Input Monitoring permission",
-        "ready": "macOS allows Voicebox to detect your global shortcut.",
-        "missing": "macOS needs to allow Voicebox to detect the global shortcut.",
+        "ready": "macOS allows MagicVox to detect your global shortcut.",
+        "missing": "macOS needs to allow MagicVox to detect the global shortcut.",
         "openSettings": "Open Settings"
       },
       "accessibility": {
         "label": "Accessibility permission",
-        "ready": "Voicebox can paste transcriptions into other apps.",
+        "ready": "MagicVox can paste transcriptions into other apps.",
         "missing": "Required so transcriptions can paste into the focused app.",
         "openSettings": "Open Settings"
       }
@@ -153,19 +153,19 @@
     "permissions": {
       "accessibility": {
         "title": "Grant Accessibility permission to enable auto-paste",
-        "body": "Voicebox needs <path>System Settings → Privacy & Security → Accessibility</path> to paste transcriptions into other apps. Your dictation still lands in the Captures tab without it.",
+        "body": "MagicVox needs <path>System Settings → Privacy & Security → Accessibility</path> to paste transcriptions into other apps. Your dictation still lands in the Captures tab without it.",
         "openSettings": "Open Settings",
         "recheck": "I've enabled it",
         "rechecking": "Checking…",
-        "stillMissing": "Still not detected. macOS usually requires quitting and reopening Voicebox after toggling the permission."
+        "stillMissing": "Still not detected. macOS usually requires quitting and reopening MagicVox after toggling the permission."
       },
       "inputMonitoring": {
         "title": "Grant Input Monitoring to enable the global shortcut",
-        "body": "Voicebox needs <path>System Settings → Privacy & Security → Input Monitoring</path> to detect your dictation chord. The toggle is on, but macOS is blocking key events until you allow it.",
+        "body": "MagicVox needs <path>System Settings → Privacy & Security → Input Monitoring</path> to detect your dictation chord. The toggle is on, but macOS is blocking key events until you allow it.",
         "openSettings": "Open Settings",
         "recheck": "I've enabled it",
         "rechecking": "Checking…",
-        "stillMissing": "Still not detected. macOS usually requires quitting and reopening Voicebox after toggling the permission."
+        "stillMissing": "Still not detected. macOS usually requires quitting and reopening MagicVox after toggling the permission."
       }
     }
   },
@@ -730,7 +730,7 @@
     },
     "language": {
       "label": "Language",
-      "description": "Choose the display language for Voicebox."
+      "description": "Choose the display language for MagicVox."
     },
     "theme": {
       "label": "Theme",
@@ -739,6 +739,16 @@
         "system": "System",
         "light": "Light",
         "dark": "Dark"
+      }
+    },
+    "accent": {
+      "label": "Accent colour",
+      "description": "The highlight colour used across MagicVox.",
+      "options": {
+        "magenta": "Magenta",
+        "violet": "Violet",
+        "purple": "Purple",
+        "gold": "Classic gold"
       }
     },
     "general": {
@@ -751,7 +761,7 @@
       },
       "serverUrl": {
         "title": "Server URL",
-        "description": "The address of your voicebox backend server.",
+        "description": "The address of your MagicVox backend server.",
         "invalidUrl": "Please enter a valid URL",
         "updatedTitle": "Server URL updated",
         "updatedDescription": "Connected to {{url}}"
@@ -806,7 +816,7 @@
       },
       "api": {
         "title": "API Access",
-        "description": "Integrate Voicebox into your workflow via the REST API at <code>{{url}}</code>",
+        "description": "Integrate MagicVox into your workflow via the REST API at <code>{{url}}</code>",
         "viewReference": "View the full API reference",
         "endpoints": {
           "generate": "Generate speech",
@@ -839,9 +849,18 @@
         "description": "Automatically play audio when a generation completes."
       },
       "folder": {
-        "title": "Generations folder",
+        "title": "Output folder",
         "description": "Where generated audio files are stored on disk.",
-        "open": "Open"
+        "open": "Open",
+        "change": "Change…",
+        "useDefault": "Use default",
+        "pickTitle": "Choose where to save generated audio",
+        "defaultHint": "New audio is saved in the app's data folder.",
+        "customHint": "New audio is saved here. Earlier outputs stay where they are and still play.",
+        "changed": "Output folder changed",
+        "resetDone": "Output folder reset to default",
+        "existingStay": "New generations go to the new folder; existing ones stay where they were saved.",
+        "changeFailed": "Couldn't use that folder"
       },
       "sidebar": {
         "aboutTitle": "About voice generation",
@@ -895,7 +914,7 @@
         },
         "autoPaste": {
           "title": "Auto-paste into focused text field",
-          "description": "If a text input is focused in another app, paste directly into it. Voicebox saves and restores whatever was on your clipboard."
+          "description": "If a text input is focused in another app, paste directly into it. MagicVox saves and restores whatever was on your clipboard."
         }
       },
       "transcription": {
@@ -903,7 +922,7 @@
         "description": "Pick which speech-to-text model runs on your captures.",
         "model": {
           "title": "Transcription model",
-          "description": "Whisper ships with Voicebox and runs entirely on your machine.",
+          "description": "Whisper ships with MagicVox and runs entirely on your machine.",
           "base": "Whisper Base · 74M · {{tail}}",
           "small": "Whisper Small · 244M · {{tail}}",
           "medium": "Whisper Medium · 769M · {{tail}}",
@@ -979,7 +998,7 @@
       },
       "storage": {
         "title": "Storage",
-        "description": "Captures are saved as paired audio and transcript files in your Voicebox data directory.",
+        "description": "Captures are saved as paired audio and transcript files in your MagicVox data directory.",
         "retention": {
           "title": "Retention",
           "description": "How long to keep captures. Applies to both audio and transcripts.",
@@ -996,7 +1015,7 @@
       },
       "sidebar": {
         "aboutTitle": "About Captures",
-        "aboutBody": "Hold a shortcut anywhere on your machine, speak, and Voicebox turns your voice into text. Replay it in any cloned voice, paste it into any app, or pipe it into your coding agent.",
+        "aboutBody": "Hold a shortcut anywhere on your machine, speak, and MagicVox turns your voice into text. Replay it in any cloned voice, paste it into any app, or pipe it into your coding agent.",
         "differencesTitle": "What's different",
         "local": {
           "title": "Fully local.",
@@ -1012,14 +1031,14 @@
         },
         "windowsCaveat": {
           "title": "Heads-up on Windows",
-          "body": "The shortcut won't fire while Voicebox itself or any app running as administrator is focused. Working on it."
+          "body": "The shortcut won't fire while MagicVox itself or any app running as administrator is focused. Working on it."
         }
       }
     },
     "mcp": {
       "install": {
         "title": "Install into your agent",
-        "description": "Voicebox exposes a local MCP server whenever the app is open. Paste one of these snippets into your agent's MCP config.",
+        "description": "MagicVox exposes a local MCP server whenever the app is open. Paste one of these snippets into your agent's MCP config.",
         "http": {
           "title": "HTTP (recommended)",
           "description": "For clients that speak HTTP MCP — Claude Code, Cursor, Windsurf, VS Code."
@@ -1060,7 +1079,7 @@
       },
       "sidebar": {
         "aboutTitle": "About MCP",
-        "aboutBody": "Model Context Protocol lets your AI coding agent — Claude Code, Cursor, Windsurf — call Voicebox tools. Speak in a cloned voice, transcribe audio, browse captures.",
+        "aboutBody": "Model Context Protocol lets your AI coding agent — Claude Code, Cursor, Windsurf — call MagicVox tools. Speak in a cloned voice, transcribe audio, browse captures.",
         "toolsTitle": "Available tools",
         "tools": {
           "speak": "Speak text in a voice profile.",
@@ -1120,7 +1139,7 @@
         "deleteCuda": "Failed to delete CUDA backend",
         "deleteRocm": "Failed to delete ROCm backend"
       },
-      "footer": "Voicebox automatically detects and uses the best available GPU on your system. On Apple Silicon Macs, the MLX backend runs natively on the Neural Engine and GPU via Metal Performance Shaders (MPS), with no additional setup required. On Windows, you can download optional CUDA (NVIDIA) or ROCm (AMD) backends for hardware-accelerated inference. Intel XPU and DirectML are also supported where available through PyTorch. When no GPU is detected, Voicebox falls back to CPU — all engines still work, just slower.",
+      "footer": "MagicVox automatically detects and uses the best available GPU on your system. On Apple Silicon Macs, the MLX backend runs natively on the Neural Engine and GPU via Metal Performance Shaders (MPS), with no additional setup required. On Windows, you can download optional CUDA (NVIDIA) or ROCm (AMD) backends for hardware-accelerated inference. Intel XPU and DirectML are also supported where available through PyTorch. When no GPU is detected, MagicVox falls back to CPU — all engines still work, just slower.",
       "rocm": {
         "title": "AMD ROCm Backend",
         "activeTitle": "ROCm Backend Active",
@@ -1437,6 +1456,7 @@
       "label": "Sort by",
       "created_at": "Date created",
       "duration": "Audio length",
+      "file_size": "File size",
       "generation_seconds": "Generation time",
       "profile_name": "Voice name",
       "text_length": "Text length",
@@ -1449,6 +1469,7 @@
       "date": "Group: Date",
       "profile": "Group: Voice",
       "engine": "Group: Model",
+      "length": "Group: Length",
       "language": "Group: Language",
       "status": "Group: Status"
     },
@@ -1484,6 +1505,10 @@
       "unfavorite": "Unfavorite",
       "copyText": "Copy text",
       "reuseText": "Reuse text in editor"
+    },
+    "outputFolder": {
+      "tooltip": "Output folder",
+      "title": "Save new audio to"
     }
   }
 }

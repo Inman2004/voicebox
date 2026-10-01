@@ -1,6 +1,6 @@
 """User settings endpoints — capture/refine and generation defaults."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -33,5 +33,8 @@ async def update_generation_settings_endpoint(
     patch: models.GenerationSettingsUpdate,
     db: Session = Depends(get_db),
 ):
-    row = settings_service.update_generation_settings_from_request(db, patch)
+    try:
+        row = settings_service.update_generation_settings_from_request(db, patch)
+    except ValueError as e:  # unusable output folder
+        raise HTTPException(status_code=400, detail=str(e)) from e
     return settings_service.generation_settings_to_response(row)

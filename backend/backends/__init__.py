@@ -12,6 +12,7 @@ and a model config registry that eliminates per-engine dispatch maps.
 # HF_HUB_OFFLINE=1 and on network failures.
 from ..utils import hf_offline_patch  # noqa: F401
 
+import logging
 import threading
 from dataclasses import dataclass, field
 from typing import Protocol, Optional, Tuple, List
@@ -22,6 +23,8 @@ DEFAULT_LLM_MAX_TOKENS = 512
 DEFAULT_LLM_TEMPERATURE = 0.7
 
 from ..utils.platform_detect import get_backend_type
+
+logger = logging.getLogger(__name__)
 
 LANGUAGE_CODE_TO_NAME = {
     "zh": "chinese",
@@ -772,6 +775,51 @@ def check_model_loaded(config: ModelConfig) -> bool:
         return backend.is_loaded()
     except Exception:
         return False
+
+
+def _is_instantiated(config: ModelConfig) -> bool:
+    """Whether a backend object for this config exists (never creates one)."""
+    if config.engine == "whisper":
+        return _stt_backend is not None
+    if config.engine == "qwen_llm":
+        return config.engine in _llm_backends
+    if config.engine == "qwen":
+        return _tts_backend is not None or config.engine in _tts_backends
+    return config.engine in _tts_backends
+
+
+def free_vram_for(engine: str, needed_mb: float) -> list[str]:
+    """Unload other resident models when free CUDA memory is below *needed_mb*.
+
+    On small GPUs (e.g. 4 GB) a model left loaded by another engine pushes
+    the next load past dedicated VRAM, and the Windows driver then silently
+    spills allocations into shared system RAM. Only models that are already
+    loaded are considered, and nothing is unloaded while there is room.
+    Returns the names of the models that were unloaded.
+    """
+    import torch
+
+    if not torch.cuda.is_available():
+        return []
+    free_mb = torch.cuda.mem_get_info()[0] / (1024 * 1024)
+    if free_mb >= needed_mb:
+        return []
+    unloaded = []
+    for config in get_all_model_configs():
+        if config.engine == engine or not _is_instantiated(config):
+            continue
+        try:
+            if check_model_loaded(config) and unload_model_by_config(config):
+                unloaded.append(config.model_name)
+        except Exception as e:  # a busy model stays loaded; the load reports OOM if it matters
+            logger.warning("Could not unload %s to free VRAM: %s", config.model_name, e)
+    if unloaded:
+        torch.cuda.empty_cache()
+        logger.info(
+            "Freed VRAM for %s (needed %.0f MB, had %.0f MB free): unloaded %s",
+            engine, needed_mb, free_mb, ", ".join(unloaded),
+        )
+    return unloaded
 
 
 def get_model_load_func(config: ModelConfig):

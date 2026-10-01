@@ -3,6 +3,7 @@
 import logging
 import os
 import threading
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter
@@ -92,6 +93,10 @@ def _loaded_models() -> list[str]:
 
 @router.get("/system/resources", response_model=models.SystemResourcesResponse)
 async def get_system_resources():
+    from ..services import inference_runtime as runtime
+    inference = runtime.snapshot()
+    if inference and inference.get("memory"):
+        inference["memory"] = runtime.cuda_memory() or inference["memory"]
     cpu_percent = app_ram = sys_used = sys_total = None
     try:
         import psutil
@@ -115,6 +120,8 @@ async def get_system_resources():
     gpu_percent, gpu_name, vram_used, vram_total = _gpu_stats()
 
     return models.SystemResourcesResponse(
+        observed_at=datetime.now(timezone.utc).isoformat(),
+        inference=inference,
         cpu_percent=cpu_percent,
         app_ram_mb=app_ram,
         system_ram_used_mb=sys_used,

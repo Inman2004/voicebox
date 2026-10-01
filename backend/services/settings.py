@@ -11,6 +11,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from .. import config
 from ..database import CaptureSettings as DBCaptureSettings
 from ..database import GenerationSettings as DBGenerationSettings
 from ..utils.capture_chords import (
@@ -117,6 +118,10 @@ def generation_settings_to_response(row: DBGenerationSettings):
         speed=row.speed if row.speed is not None else 1.0,
         preprocessing=models.PreprocessingOptions.model_validate(_load_json(row.preprocessing_json)),
         postprocessing=_postprocessing_from_row(row),
+        qwen_execution=models.QwenExecutionOptions.model_validate(_load_json(row.qwen_execution_json)),
+        output_dir=row.output_dir,
+        effective_output_dir=str(config.get_generations_dir()),
+        default_output_dir=str(config.get_default_generations_dir()),
     )
 
 
@@ -139,6 +144,14 @@ def update_generation_settings_from_request(db: Session, update) -> DBGeneration
     patch = update.model_dump(exclude_unset=True, by_alias=True)
     preprocessing = patch.pop("preprocessing", None)
     postprocessing = patch.pop("postprocessing", None)
+    execution = patch.pop("qwen_execution", None)
+    if "output_dir" in patch:
+        # Validate and switch before saving; "" / null restores the default.
+        folder = (patch["output_dir"] or "").strip() or None
+        config.set_generations_dir(folder)  # raises ValueError if unusable
+        patch["output_dir"] = str(config.get_generations_dir()) if folder else None
+    if execution is not None:
+        patch["qwen_execution_json"] = json.dumps(execution)
     if preprocessing is not None:
         patch["preprocessing_json"] = json.dumps(preprocessing)
     if postprocessing is not None:

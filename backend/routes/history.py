@@ -188,6 +188,8 @@ async def get_generation(
         completed_at=gen.completed_at,
         load_seconds=gen.load_seconds,
         generation_seconds=gen.generation_seconds,
+        diagnostics=gen.diagnostics,
+        file_size=gen.file_size,
         created_at=gen.created_at,
     )
 

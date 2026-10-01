@@ -7,7 +7,7 @@ import { SimpleTooltip } from '@/components/ui/tooltip';
 import type { HistoryResponse } from '@/lib/api/types';
 import type { GenerationActions } from '@/lib/hooks/useGenerationActions';
 import { cn } from '@/lib/utils/cn';
-import { formatAbsoluteDate, formatDate, formatDuration } from '@/lib/utils/format';
+import { formatAbsoluteDate, formatDate, formatDuration, formatFileSize } from '@/lib/utils/format';
 import { usePlayerStore } from '@/stores/playerStore';
 import { GenerationMenu } from './GenerationMenu';
 
@@ -55,8 +55,12 @@ function SelectBox({
       }}
       className={cn(
         'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all',
-        selected ? 'border-accent bg-accent text-accent-foreground' : 'border-muted-foreground/40 bg-background/60',
-        visible || selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+        selected
+          ? 'border-accent bg-accent text-accent-foreground'
+          : 'border-muted-foreground/40 bg-background/60',
+        visible || selected
+          ? 'opacity-100'
+          : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
         className,
       )}
     >
@@ -65,14 +69,27 @@ function SelectBox({
   );
 }
 
-function PlayButton({ gen, actions, size = 'md' }: { gen: HistoryResponse; actions: GenerationActions; size?: 'sm' | 'md' }) {
+function PlayButton({
+  gen,
+  actions,
+  size = 'md',
+}: {
+  gen: HistoryResponse;
+  actions: GenerationActions;
+  size?: 'sm' | 'md';
+}) {
   const { isPlaying, playable, failed } = useItemState(gen);
   const setIsPlaying = usePlayerStore((s) => s.setIsPlaying);
   const dims = size === 'sm' ? 'h-7 w-7' : 'h-8 w-8';
   if (failed) {
     return (
       <SimpleTooltip content={gen.error || 'Generation failed'}>
-        <span className={cn('flex shrink-0 items-center justify-center rounded-full bg-destructive/15 text-destructive', dims)}>
+        <span
+          className={cn(
+            'flex shrink-0 items-center justify-center rounded-full bg-destructive/15 text-destructive',
+            dims,
+          )}
+        >
           <AlertCircle className="h-4 w-4" />
         </span>
       </SimpleTooltip>
@@ -90,11 +107,17 @@ function PlayButton({ gen, actions, size = 'md' }: { gen: HistoryResponse; actio
       aria-label={isPlaying ? 'Pause' : 'Play'}
       className={cn(
         'flex shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40',
-        isPlaying ? 'bg-accent text-accent-foreground' : 'bg-foreground/90 text-background hover:bg-foreground',
+        isPlaying
+          ? 'bg-accent text-accent-foreground'
+          : 'bg-foreground/90 text-background hover:bg-foreground',
         dims,
       )}
     >
-      {isPlaying ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
+      {isPlaying ? (
+        <Pause className="h-3.5 w-3.5 fill-current" />
+      ) : (
+        <Play className="h-3.5 w-3.5 fill-current" />
+      )}
     </button>
   );
 }
@@ -119,11 +142,20 @@ function FavoriteStar({ gen, actions }: { gen: HistoryResponse; actions: Generat
   );
 }
 
-function Meta({ gen, engineName }: { gen: HistoryResponse; engineName: GalleryItemProps['engineName'] }) {
+function Meta({
+  gen,
+  engineName,
+}: {
+  gen: HistoryResponse;
+  engineName: GalleryItemProps['engineName'];
+}) {
   return (
     <>
       {gen.status === 'completed' && gen.duration != null && (
         <span className="tabular-nums">{formatDuration(gen.duration)}</span>
+      )}
+      {gen.status === 'completed' && gen.file_size != null && (
+        <span className="tabular-nums">{formatFileSize(gen.file_size)}</span>
       )}
       <span className="truncate">{engineName(gen.engine)}</span>
       <span className="uppercase">{gen.language}</span>
@@ -155,7 +187,11 @@ export function GalleryCard(props: GalleryItemProps) {
       }}
       className={cn(
         'group relative flex cursor-pointer flex-col gap-2 rounded-2xl border bg-card/60 p-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        selected ? 'border-accent bg-accent/10' : isCurrent ? 'border-accent/50' : 'border-border hover:bg-muted/40',
+        selected
+          ? 'border-accent bg-accent/10'
+          : isCurrent
+            ? 'border-accent/50'
+            : 'border-border hover:bg-muted/40',
       )}
     >
       <div className="flex items-center gap-2">
@@ -164,7 +200,10 @@ export function GalleryCard(props: GalleryItemProps) {
           <VoiceAvatar
             name={gen.profile_name}
             avatarUrl={gen.profile_avatar_url}
-            className={cn('h-7 w-7 transition-opacity', (selected || selectionMode) && 'opacity-30')}
+            className={cn(
+              'h-7 w-7 transition-opacity',
+              (selected || selectionMode) && 'opacity-30',
+            )}
           />
           <SelectBox
             gen={gen}
@@ -177,13 +216,17 @@ export function GalleryCard(props: GalleryItemProps) {
         <div className="min-w-0 flex-1 leading-tight">
           <p className="truncate text-sm font-semibold">{gen.profile_name}</p>
           <SimpleTooltip content={formatAbsoluteDate(gen.created_at)}>
-            <p className="truncate text-[11px] text-muted-foreground">{formatDate(gen.created_at)}</p>
+            <p className="truncate text-[11px] text-muted-foreground">
+              {formatDate(gen.created_at)}
+            </p>
           </SimpleTooltip>
         </div>
         <FavoriteStar gen={gen} actions={actions} />
       </div>
 
-      <p className="line-clamp-3 min-h-[3.75rem] text-sm leading-5 text-muted-foreground">{gen.text}</p>
+      <p className="line-clamp-3 min-h-[3.75rem] text-sm leading-5 text-muted-foreground">
+        {gen.text}
+      </p>
 
       <div className="flex items-center gap-2">
         <PlayButton gen={gen} actions={actions} />
@@ -193,7 +236,11 @@ export function GalleryCard(props: GalleryItemProps) {
           </div>
         ) : null}
         <div className="flex min-w-0 flex-1 items-center gap-2 text-xs text-muted-foreground">
-          {inProgress ? <LiveGenerationLabel gen={gen} /> : <Meta gen={gen} engineName={engineName} />}
+          {inProgress ? (
+            <LiveGenerationLabel gen={gen} />
+          ) : (
+            <Meta gen={gen} engineName={engineName} />
+          )}
         </div>
         <GenerationMenu
           gen={gen}
@@ -238,7 +285,11 @@ export function GalleryRow(props: GalleryItemProps) {
       <span className="w-28 shrink-0 truncate text-sm font-medium">{gen.profile_name}</span>
       <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{gen.text}</span>
       <div className="hidden w-56 shrink-0 items-center justify-end gap-3 text-xs text-muted-foreground xl:flex">
-        {inProgress ? <LiveGenerationLabel gen={gen} /> : <Meta gen={gen} engineName={engineName} />}
+        {inProgress ? (
+          <LiveGenerationLabel gen={gen} />
+        ) : (
+          <Meta gen={gen} engineName={engineName} />
+        )}
       </div>
       <SimpleTooltip content={formatAbsoluteDate(gen.created_at)}>
         <span className="hidden w-24 shrink-0 truncate text-right text-xs text-muted-foreground lg:block">
@@ -246,7 +297,12 @@ export function GalleryRow(props: GalleryItemProps) {
         </span>
       </SimpleTooltip>
       <FavoriteStar gen={gen} actions={actions} />
-      <GenerationMenu gen={gen} actions={actions} onApplyEffects={props.onApplyEffects} onDelete={props.onDelete} />
+      <GenerationMenu
+        gen={gen}
+        actions={actions}
+        onApplyEffects={props.onApplyEffects}
+        onDelete={props.onDelete}
+      />
     </div>
   );
 }

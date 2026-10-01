@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api/client';
-import type { EffectConfig, EngineId, GenerationRequest, GenerationResponse } from '@/lib/api/types';
+import type {
+  EffectConfig,
+  EngineId,
+  GenerationRequest,
+  GenerationResponse,
+} from '@/lib/api/types';
 import type { LanguageCode } from '@/lib/constants/languages';
 import { fetchEngines, hasModelSizes, resolveVariant } from '@/lib/hooks/useEngines';
 import { useGeneration } from '@/lib/hooks/useGeneration';
@@ -79,6 +84,8 @@ export function useSubmitGeneration() {
           ? (variant?.model_size as GenerationRequest['model_size'])
           : undefined,
         engine: input.engine,
+        qwen_execution:
+          input.engine === 'qwen_custom_voice' ? genSettings?.qwen_execution : undefined,
         // Only engines that honour instruct at model level get it.
         instruct: engine?.supports_instruct ? input.instruct || undefined : undefined,
         personality: input.personality || undefined,

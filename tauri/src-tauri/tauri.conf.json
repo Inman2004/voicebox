@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Voicebox",
+  "productName": "MagicVox",
   "version": "0.5.0",
   "identifier": "sh.voicebox.app",
   "build": {

@@ -20,7 +20,7 @@ export function useSystemResources(enabled: boolean, intervalMs = 2000) {
     queryKey: ['systemResources'],
     queryFn: () => apiClient.getSystemResources(),
     enabled: active,
-    refetchInterval: active ? intervalMs : false,
+    refetchInterval: (query) => active ? (query.state.data?.inference?.active ? 1000 : intervalMs) : false,
     staleTime: 0,
   });
 }

@@ -2,6 +2,14 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export type Theme = 'light' | 'dark' | 'system';
+export type Accent = 'magenta' | 'violet' | 'purple' | 'gold';
+
+function applyAccent(accent: Accent) {
+  if (typeof document === 'undefined') return;
+  // Magenta is the stylesheet default; others override via html[data-accent].
+  if (accent === 'magenta') delete document.documentElement.dataset.accent;
+  else document.documentElement.dataset.accent = accent;
+}
 
 function resolveTheme(theme: Theme): 'light' | 'dark' {
   if (theme !== 'system') return theme;
@@ -66,6 +74,8 @@ interface UIStore {
   // Theme
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  accent: Accent;
+  setAccent: (accent: Accent) => void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -103,17 +113,26 @@ export const useUIStore = create<UIStore>()(
         set({ theme });
         applyTheme(theme);
       },
+      accent: 'magenta',
+      setAccent: (accent) => {
+        set({ accent });
+        applyAccent(accent);
+      },
     }),
     {
       name: 'voicebox-ui',
       partialize: (state) => ({
         selectedProfileId: state.selectedProfileId,
         theme: state.theme,
+        accent: state.accent,
         sidebarCollapsed: state.sidebarCollapsed,
         resourcesExpanded: state.resourcesExpanded,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state) applyTheme(state.theme);
+        if (state) {
+          applyTheme(state.theme);
+          applyAccent(state.accent ?? 'magenta');
+        }
       },
     },
   ),

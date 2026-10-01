@@ -104,6 +104,7 @@ async def create_generation(
         model_size=model_size,
         status=status,
         source=source,
+        file_size=audio_file_size(audio_path),
         created_at=datetime.utcnow(),
     )
 
@@ -112,6 +113,15 @@ async def create_generation(
     db.refresh(db_generation)
 
     return GenerationResponse.model_validate(db_generation)
+
+
+def audio_file_size(audio_path: Optional[str]) -> Optional[int]:
+    """Size in bytes of a stored audio file, or None if it is missing."""
+    resolved = config.resolve_storage_path(audio_path) if audio_path else None
+    try:
+        return resolved.stat().st_size if resolved is not None else None
+    except OSError:
+        return None
 
 
 async def update_generation_status(
@@ -138,6 +148,7 @@ async def update_generation_status(
     generation.status = status
     if audio_path is not None:
         generation.audio_path = audio_path
+        generation.file_size = audio_file_size(audio_path)
     if duration is not None:
         generation.duration = duration
     if error is not None:
@@ -209,8 +220,12 @@ def _apply_history_filters(q, query: HistoryQuery):
     return q
 
 
+# Length groups (seconds) for group_by="length"; mirrored in the Gallery's grouping.ts.
+LENGTH_BUCKETS = (30, 120, 600)
+
+
 def _history_ordering(query: HistoryQuery) -> list:
-    from sqlalchemy import func
+    from sqlalchemy import case, func
 
     sort_columns = {
         "created_at": DBGeneration.created_at,
@@ -218,6 +233,7 @@ def _history_ordering(query: HistoryQuery) -> list:
         "generation_seconds": DBGeneration.generation_seconds,
         "profile_name": func.lower(DBVoiceProfile.name),
         "text_length": func.length(DBGeneration.text),
+        "file_size": DBGeneration.file_size,
     }
     column = sort_columns[query.sort_by]
     primary = column.asc() if query.order == "asc" else column.desc()
@@ -230,7 +246,17 @@ def _history_ordering(query: HistoryQuery) -> list:
         "language": DBGeneration.language,
         "status": DBGeneration.status,
     }
-    if query.group_by in group_columns:
+    if query.group_by == "length":
+        # Longest group first: 10 min+, 2–10 min, 30 s–2 min, under 30 s.
+        short, medium, long_ = LENGTH_BUCKETS
+        bucket = case(
+            (DBGeneration.duration >= long_, 0),
+            (DBGeneration.duration >= medium, 1),
+            (DBGeneration.duration >= short, 2),
+            else_=3,
+        )
+        ordering = [bucket.asc(), *ordering]
+    elif query.group_by in group_columns:
         ordering = [group_columns[query.group_by].asc(), *ordering]
     elif query.group_by == "date" and query.sort_by != "created_at":
         # Day buckets are contiguous only when ordered by time first.
@@ -275,6 +301,8 @@ async def list_generations(
             completed_at=generation.completed_at,
             load_seconds=generation.load_seconds,
             generation_seconds=generation.generation_seconds,
+            diagnostics=generation.diagnostics,
+            file_size=generation.file_size,
             created_at=generation.created_at,
             versions=versions,
             active_version_id=active_version_id,

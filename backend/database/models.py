@@ -91,6 +91,8 @@ class Generation(Base):
     completed_at = Column(DateTime, nullable=True)
     load_seconds = Column(Float, nullable=True)
     generation_seconds = Column(Float, nullable=True)
+    diagnostics = Column(JSON, nullable=True)
+    file_size = Column(Integer, nullable=True)  # bytes of the audio file
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -245,6 +247,9 @@ class GenerationSettings(Base):
     # "use the schema defaults".
     preprocessing_json = Column(Text, nullable=True)
     postprocessing_json = Column(Text, nullable=True)
+    qwen_execution_json = Column(Text, nullable=True)
+    # Folder for new generated audio; NULL = <data dir>/generations.
+    output_dir = Column(Text, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 

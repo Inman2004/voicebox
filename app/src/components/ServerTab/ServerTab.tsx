@@ -15,8 +15,7 @@ interface SettingsTab {
     | '/settings/mcp'
     | '/settings/gpu'
     | '/settings/logs'
-    | '/settings/changelog'
-    | '/settings/about';
+    | '/settings/changelog';
   tauriOnly?: boolean;
 }
 
@@ -28,7 +27,6 @@ const tabs: SettingsTab[] = [
   { labelKey: 'settings.tabs.gpu', path: '/settings/gpu', tauriOnly: true },
   { labelKey: 'settings.tabs.logs', path: '/settings/logs', tauriOnly: true },
   { labelKey: 'settings.tabs.changelog', path: '/settings/changelog' },
-  { labelKey: 'settings.tabs.about', path: '/settings/about' },
 ];
 
 export function SettingsLayout() {

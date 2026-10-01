@@ -99,6 +99,7 @@ export interface PostprocessingOptions {
 }
 
 export interface GenerationRequest {
+  qwen_execution?: QwenExecutionOptions;
   profile_id: string;
   text: string;
   language: LanguageCode;
@@ -137,6 +138,7 @@ export interface GenerationVersionResponse {
 }
 
 export interface GenerationResponse {
+  diagnostics?: InferenceDiagnostics | null;
   id: string;
   profile_id: string;
   text: string;
@@ -156,13 +158,28 @@ export interface GenerationResponse {
   load_seconds?: number | null;
   /** Synthesis + post-processing wall time. */
   generation_seconds?: number | null;
+  /** Size of the audio file in bytes. */
+  file_size?: number | null;
   created_at: string;
   versions?: GenerationVersionResponse[];
   active_version_id?: string;
 }
 
-export type HistorySort = 'created_at' | 'duration' | 'generation_seconds' | 'profile_name' | 'text_length';
-export type HistoryGroup = 'none' | 'date' | 'profile' | 'engine' | 'language' | 'status';
+export type HistorySort =
+  | 'created_at'
+  | 'duration'
+  | 'generation_seconds'
+  | 'profile_name'
+  | 'text_length'
+  | 'file_size';
+export type HistoryGroup =
+  | 'none'
+  | 'date'
+  | 'profile'
+  | 'engine'
+  | 'language'
+  | 'status'
+  | 'length';
 export type HistoryStatusFilter = 'completed' | 'failed' | 'in_progress';
 
 export interface HistoryQuery {
@@ -315,7 +332,59 @@ export interface CaptureReadinessResponse {
   llm: ModelReadiness;
 }
 
+export interface QwenExecutionOptions {
+  mode: 'auto' | 'cuda_only' | 'cpu';
+  precision: 'auto' | 'bf16' | 'fp16';
+  efficient_attention?: boolean;
+  fast_decode?: boolean;
+}
+
+export interface InferenceDiagnostics {
+  observed_at: string;
+  job_id?: string | null;
+  active?: boolean;
+  requested?: QwenExecutionOptions['mode'];
+  actual?: 'unverified' | 'cuda' | 'cpu' | 'mixed' | 'cuda_oom';
+  stage?: string;
+  model?: string;
+  backend?: string;
+  dtype?: string;
+  attention?: string | null;
+  quantization?: string;
+  decoder?: {
+    path: 'cuda_graph' | 'standard' | 'none';
+    reason?: string | null;
+    frames: number;
+    frames_per_second?: number | null;
+    capture_seconds: number;
+    static_cache_bytes: number;
+  } | null;
+  evicted_models?: string[];
+  generation_seconds?: number;
+  audio_seconds?: number;
+  failure?: { code: string; message: string } | null;
+  memory?: {
+    allocated_bytes: number;
+    reserved_bytes: number;
+    peak_allocated_bytes: number;
+    peak_reserved_bytes: number;
+    free_bytes: number;
+    total_bytes: number;
+    driver_residency: string;
+  } | null;
+  components?: Array<{
+    name: string;
+    devices: string[];
+    dtypes: string[];
+    storage_bytes: number;
+    executed: boolean;
+    input_devices: string[];
+    output_devices: string[];
+  }>;
+}
+
 export interface GenerationSettings {
+  qwen_execution?: QwenExecutionOptions;
   max_chunk_chars: number;
   crossfade_ms: number;
   normalize_audio: boolean;
@@ -323,9 +392,16 @@ export interface GenerationSettings {
   speed: number;
   preprocessing: PreprocessingOptions;
   postprocessing: PostprocessingOptions;
+  /** Folder the user chose for generated audio; null = default location. */
+  output_dir?: string | null;
+  /** Where new audio is being written right now (read-only). */
+  effective_output_dir?: string | null;
+  default_output_dir?: string | null;
 }
 
-export type GenerationSettingsUpdate = Partial<GenerationSettings>;
+export type GenerationSettingsUpdate = Partial<
+  Omit<GenerationSettings, 'effective_output_dir' | 'default_output_dir'>
+>;
 
 export interface TranscriptionRequest {
   language?: LanguageCode;
@@ -720,6 +796,8 @@ export interface GenerationPreset {
 // ── System resources ─────────────────────────────────────────────────
 
 export interface SystemResources {
+  observed_at?: string | null;
+  inference?: InferenceDiagnostics | null;
   cpu_percent: number | null;
   app_ram_mb: number | null;
   system_ram_used_mb: number | null;

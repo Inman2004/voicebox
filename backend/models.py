@@ -3,7 +3,7 @@ Pydantic models for request/response validation.
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime
 
 from .utils.capture_chords import (
@@ -110,6 +110,15 @@ class PostprocessingOptions(BaseModel):
     target_lufs: float = Field(default=-16.0, ge=-40.0, le=-8.0)
 
 
+class QwenExecutionOptions(BaseModel):
+    mode: Literal["auto", "cuda_only", "cpu"] = "auto"
+    precision: Literal["auto", "bf16", "fp16"] = "auto"
+    efficient_attention: bool = False
+    # CUDA-graph talker decoding (backends/qwen_fast_decode.py); falls back
+    # to the standard decoder automatically when unsupported.
+    fast_decode: bool = True
+
+
 class GenerationRequest(BaseModel):
     """Request model for voice generation."""
 
@@ -144,6 +153,7 @@ class GenerationRequest(BaseModel):
         None,
         description="Audio post-processing. Omit to use the saved defaults (legacy `normalize` still honoured).",
     )
+    qwen_execution: Optional[QwenExecutionOptions] = None
 
 
 class GenerationResponse(BaseModel):
@@ -167,6 +177,7 @@ class GenerationResponse(BaseModel):
     completed_at: Optional[datetime] = None
     load_seconds: Optional[float] = None
     generation_seconds: Optional[float] = None
+    diagnostics: Optional[dict] = None
     created_at: datetime
     versions: Optional[List["GenerationVersionResponse"]] = None
     active_version_id: Optional[str] = None
@@ -175,8 +186,8 @@ class GenerationResponse(BaseModel):
         from_attributes = True
 
 
-HISTORY_SORT_PATTERN = "^(created_at|duration|generation_seconds|profile_name|text_length)$"
-HISTORY_GROUP_PATTERN = "^(none|date|profile|engine|language|status)$"
+HISTORY_SORT_PATTERN = "^(created_at|duration|generation_seconds|profile_name|text_length|file_size)$"
+HISTORY_GROUP_PATTERN = "^(none|date|profile|engine|language|status|length)$"
 
 
 class HistoryQuery(BaseModel):
@@ -230,6 +241,8 @@ class HistoryExportZipRequest(BaseModel):
 
 
 class HistoryResponse(BaseModel):
+    diagnostics: Optional[dict] = None
+    file_size: Optional[int] = None
     """Response model for history entry (includes profile name)."""
 
     id: str
@@ -394,6 +407,12 @@ class GenerationSettingsResponse(BaseModel):
     speed: float = Field(default=1.0, ge=0.5, le=2.0)
     preprocessing: PreprocessingOptions = Field(default_factory=PreprocessingOptions)
     postprocessing: PostprocessingOptions = Field(default_factory=PostprocessingOptions)
+    qwen_execution: QwenExecutionOptions = Field(default_factory=QwenExecutionOptions)
+    # Folder the user chose for generated audio (None = default location).
+    output_dir: Optional[str] = None
+    # Where new audio is actually being written right now.
+    effective_output_dir: Optional[str] = None
+    default_output_dir: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -409,6 +428,9 @@ class GenerationSettingsUpdate(BaseModel):
     speed: Optional[float] = Field(default=None, ge=0.5, le=2.0)
     preprocessing: Optional[PreprocessingOptions] = None
     postprocessing: Optional[PostprocessingOptions] = None
+    qwen_execution: Optional[QwenExecutionOptions] = None
+    # Absolute folder for new generated audio; "" or null restores the default.
+    output_dir: Optional[str] = Field(default=None, max_length=1024)
 
 
 class GenerationPresetSettings(BaseModel):
@@ -517,6 +539,8 @@ class ActivateVoiceResponse(BaseModel):
 
 
 class SystemResourcesResponse(BaseModel):
+    observed_at: Optional[str] = None
+    inference: Optional[dict] = None
     cpu_percent: Optional[float] = None
     app_ram_mb: Optional[float] = None
     system_ram_used_mb: Optional[float] = None

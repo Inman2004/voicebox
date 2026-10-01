@@ -21,13 +21,26 @@ function dateBucket(createdAt: string, now: Date): { key: string; label: string 
   const d = new Date(ms);
   const key = `${d.getFullYear()}-${d.getMonth()}`;
   const sameYear = d.getFullYear() === now.getFullYear();
-  const label = d.toLocaleDateString(undefined, { month: 'long', ...(sameYear ? {} : { year: 'numeric' }) });
+  const label = d.toLocaleDateString(undefined, {
+    month: 'long',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  });
   return { key, label };
+}
+
+/** Mirrors backend/services/history.py LENGTH_BUCKETS (longest group first). */
+function lengthBucket(duration?: number | null): { key: string; label: string } {
+  const d = duration ?? 0;
+  if (d >= 600) return { key: 'len-4', label: '10 min and longer' };
+  if (d >= 120) return { key: 'len-3', label: '2 – 10 min' };
+  if (d >= 30) return { key: 'len-2', label: '30 s – 2 min' };
+  return { key: 'len-1', label: 'Under 30 s' };
 }
 
 function statusLabel(status: string): { key: string; label: string } {
   if (status === 'failed') return { key: 'failed', label: 'Failed' };
-  if (status === 'generating' || status === 'loading_model') return { key: 'in_progress', label: 'In progress' };
+  if (status === 'generating' || status === 'loading_model')
+    return { key: 'in_progress', label: 'In progress' };
   return { key: 'completed', label: 'Completed' };
 }
 
@@ -67,6 +80,9 @@ export function groupItems(
         break;
       case 'status':
         ({ key, label } = statusLabel(item.status));
+        break;
+      case 'length':
+        ({ key, label } = lengthBucket(item.duration));
         break;
     }
     const group = groups.get(key);

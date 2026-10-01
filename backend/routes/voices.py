@@ -265,6 +265,10 @@ def _preview_path(engine: str, voice_id: str):
     return directory / f"{safe}.wav"
 
 
+from ..services.inference_runtime import qwen_job
+
+
+@qwen_job
 async def _render_preset_preview(engine: str, voice_id: str, name: str, language: str) -> bytes:
     from ..backends import get_tts_backend_for_engine, load_engine_model
     from ..services import tts

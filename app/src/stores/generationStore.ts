@@ -1,7 +1,9 @@
 import { create } from 'zustand';
+import type { InferenceDiagnostics } from '@/lib/api/types';
 
 /** Latest SSE status for a generation — drives live timers and metadata. */
 export interface LiveGenerationStatus {
+  diagnostics?: InferenceDiagnostics | null;
   id: string;
   status: 'loading_model' | 'generating' | 'completed' | 'failed' | 'not_found';
   created_at?: string | null;

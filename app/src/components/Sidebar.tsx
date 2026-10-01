@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import voiceboxLogo from '@/assets/voicebox-logo.png';
+import voiceboxLogo from '@/assets/magicvox-logo.png';
 import { ResourcesWidget } from '@/components/Sidebar/ResourcesWidget';
 import { SimpleTooltip } from '@/components/ui/tooltip';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
@@ -127,8 +127,8 @@ export function Sidebar({ isMacOS }: SidebarProps) {
     >
       {/* Logo + collapse toggle */}
       <div className={cn('mb-6 flex items-center gap-2', collapsed ? 'flex-col' : 'px-2')}>
-        <img src={voiceboxLogo} alt="Voicebox" className="sidebar-logo h-10 w-10 object-contain" />
-        {!collapsed && <span className="flex-1 text-base font-bold">Voicebox</span>}
+        <img src={voiceboxLogo} alt="MagicVox" className="sidebar-logo h-10 w-10 object-contain" />
+        {!collapsed && <span className="flex-1 text-base font-bold">MagicVox</span>}
         {!narrow && (
           <button
             type="button"

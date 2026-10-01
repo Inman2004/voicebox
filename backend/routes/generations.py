@@ -13,6 +13,7 @@ from .. import config, models
 from ..services import history, personality, profiles, tts
 from ..database import Generation as DBGeneration, VoiceProfile as DBVoiceProfile, get_db
 from ..services.generation import run_generation
+from ..services import inference_runtime as runtime
 from ..services.task_queue import cancel_generation as cancel_generation_job, enqueue_generation
 from ..utils.audio import load_audio
 from ..utils.tasks import get_task_manager
@@ -136,6 +137,7 @@ async def generate_speech(
         generation_id,
         run_generation(
             generation_id=generation_id,
+            qwen_execution=data.qwen_execution,
             profile_id=data.profile_id,
             text=text,
             language=data.language,
@@ -312,6 +314,7 @@ async def get_generation_status(generation_id: str, db: Session = Depends(get_db
                     "completed_at": _iso(gen.completed_at),
                     "load_seconds": gen.load_seconds,
                     "generation_seconds": gen.generation_seconds,
+                    "diagnostics": runtime.snapshot(generation_id) or gen.diagnostics,
                 }
                 yield f"data: {json.dumps(payload)}\n\n"
 
@@ -342,9 +345,8 @@ async def stream_speech(
     from ..backends import (
         ensure_model_cached_or_raise,
         get_tts_backend_for_engine,
-        load_engine_model,
     )
-    from ..services.render import render_speech
+    from ..services.render import render_request
     from ..services.settings import resolve_generation_options
 
     profile = await profiles.get_profile(data.profile_id, db)
@@ -360,7 +362,6 @@ async def stream_speech(
     model_size = data.model_size or "1.7B"
 
     await ensure_model_cached_or_raise(engine, model_size)
-    await load_engine_model(engine, model_size)
 
     voice_prompt = await profiles.create_voice_prompt_for_profile(
         data.profile_id,
@@ -370,9 +371,11 @@ async def stream_speech(
 
     speed, preprocessing, postprocessing = resolve_generation_options(data, db)
     try:
-        audio, sample_rate = await render_speech(
+        audio, sample_rate = await render_request(
             tts_model,
             engine=engine,
+            model_size=model_size,
+            qwen_execution=data.qwen_execution,
             text=data.text,
             voice_prompt=voice_prompt,
             language=data.language,

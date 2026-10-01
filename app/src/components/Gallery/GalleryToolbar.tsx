@@ -27,9 +27,25 @@ import type { HistoryFacets, HistoryFacetValue, HistoryGroup, HistorySort } from
 import { ALL_LANGUAGES, type LanguageCode } from '@/lib/constants/languages';
 import { cn } from '@/lib/utils/cn';
 import { type GalleryFilters, useGalleryStore } from '@/stores/galleryStore';
+import { GalleryOutputFolder } from './GalleryOutputFolder';
 
-const SORTS: HistorySort[] = ['created_at', 'duration', 'generation_seconds', 'profile_name', 'text_length'];
-const GROUPS: HistoryGroup[] = ['none', 'date', 'profile', 'engine', 'language', 'status'];
+const SORTS: HistorySort[] = [
+  'created_at',
+  'duration',
+  'file_size',
+  'generation_seconds',
+  'profile_name',
+  'text_length',
+];
+const GROUPS: HistoryGroup[] = [
+  'none',
+  'date',
+  'profile',
+  'engine',
+  'length',
+  'language',
+  'status',
+];
 
 function FacetList({
   title,
@@ -50,14 +66,22 @@ function FacetList({
   if (!values.length) return null;
   return (
     <div className="space-y-1">
-      <p className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      <p className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </p>
       <div className="max-h-44 space-y-0.5 overflow-y-auto">
         <FacetOption active={!selected} onClick={() => onSelect(undefined)}>
           <span className="flex-1">{t('gallery.filters.any')}</span>
         </FacetOption>
         {values.map((v) => (
-          <FacetOption key={v.value} active={selected === v.value} onClick={() => onSelect(v.value)}>
-            {withAvatar && <VoiceAvatar name={v.label} avatarUrl={v.avatar_url} className="h-5 w-5 ring-0" />}
+          <FacetOption
+            key={v.value}
+            active={selected === v.value}
+            onClick={() => onSelect(v.value)}
+          >
+            {withAvatar && (
+              <VoiceAvatar name={v.label} avatarUrl={v.avatar_url} className="h-5 w-5 ring-0" />
+            )}
             <span className="flex-1 truncate">{labelFor ? labelFor(v) : v.label}</span>
             <span className="tabular-nums text-muted-foreground">{v.count}</span>
           </FacetOption>
@@ -67,7 +91,15 @@ function FacetList({
   );
 }
 
-function FacetOption({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+function FacetOption({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -75,7 +107,9 @@ function FacetOption({ active, onClick, children }: { active: boolean; onClick: 
       aria-pressed={active}
       className={cn(
         'flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs transition-colors',
-        active ? 'bg-accent/15 text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        active
+          ? 'bg-accent/15 text-foreground'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
       )}
     >
       {children}
@@ -101,14 +135,27 @@ export function GalleryToolbar({
   onToggleSelectionMode,
 }: GalleryToolbarProps) {
   const { t } = useTranslation();
-  const { view, setView, sortBy, order, setSort, groupBy, setGroupBy, filters, setFilter, clearFilters } =
-    useGalleryStore();
+  const {
+    view,
+    setView,
+    sortBy,
+    order,
+    setSort,
+    groupBy,
+    setGroupBy,
+    filters,
+    setFilter,
+    clearFilters,
+  } = useGalleryStore();
 
   const activeFilters = (
     [
       ['profileId', facets?.profiles.find((p) => p.value === filters.profileId)?.label],
       ['engine', filters.engine && engineName(filters.engine)],
-      ['language', filters.language && (ALL_LANGUAGES[filters.language as LanguageCode] ?? filters.language)],
+      [
+        'language',
+        filters.language && (ALL_LANGUAGES[filters.language as LanguageCode] ?? filters.language),
+      ],
       ['status', filters.status && t(`gallery.status.${filters.status}`)],
     ] as [keyof GalleryFilters, string | undefined][]
   ).filter(([, label]) => !!label);
@@ -145,7 +192,9 @@ export function GalleryToolbar({
             aria-label={t('gallery.filters.favoritesOnly')}
             className={cn(
               'flex h-9 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors',
-              filters.favoritesOnly ? 'bg-accent text-accent-foreground' : 'bg-muted/60 text-muted-foreground hover:text-foreground',
+              filters.favoritesOnly
+                ? 'bg-accent text-accent-foreground'
+                : 'bg-muted/60 text-muted-foreground hover:text-foreground',
             )}
           >
             <Star className={cn('h-3.5 w-3.5', filters.favoritesOnly && 'fill-current')} />
@@ -159,13 +208,17 @@ export function GalleryToolbar({
               type="button"
               className={cn(
                 'flex h-9 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors',
-                filterCount ? 'bg-accent/15 text-foreground' : 'bg-muted/60 text-muted-foreground hover:text-foreground',
+                filterCount
+                  ? 'bg-accent/15 text-foreground'
+                  : 'bg-muted/60 text-muted-foreground hover:text-foreground',
               )}
             >
               <Filter className="h-3.5 w-3.5" />
               {t('gallery.filters.title')}
               {filterCount > 0 && (
-                <span className="rounded-full bg-accent px-1.5 text-[10px] text-accent-foreground">{filterCount}</span>
+                <span className="rounded-full bg-accent px-1.5 text-[10px] text-accent-foreground">
+                  {filterCount}
+                </span>
               )}
             </button>
           </PopoverTrigger>
@@ -199,7 +252,11 @@ export function GalleryToolbar({
               labelFor={(v) => t(`gallery.status.${v.value}`)}
             />
             {filterCount > 0 && (
-              <button type="button" onClick={clearFilters} className="w-full text-center text-xs text-accent hover:underline">
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="w-full text-center text-xs text-accent hover:underline"
+              >
                 {t('gallery.filters.clear')}
               </button>
             )}
@@ -207,7 +264,10 @@ export function GalleryToolbar({
         </Popover>
 
         <Select value={sortBy} onValueChange={(v) => setSort(v as HistorySort, order)}>
-          <SelectTrigger className="h-9 w-[170px] rounded-full text-xs" aria-label={t('gallery.sort.label')}>
+          <SelectTrigger
+            className="h-9 w-[170px] rounded-full text-xs"
+            aria-label={t('gallery.sort.label')}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -225,12 +285,19 @@ export function GalleryToolbar({
             aria-label={order === 'desc' ? t('gallery.sort.desc') : t('gallery.sort.asc')}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-muted-foreground hover:text-foreground"
           >
-            {order === 'desc' ? <ArrowDownWideNarrow className="h-4 w-4" /> : <ArrowUpNarrowWide className="h-4 w-4" />}
+            {order === 'desc' ? (
+              <ArrowDownWideNarrow className="h-4 w-4" />
+            ) : (
+              <ArrowUpNarrowWide className="h-4 w-4" />
+            )}
           </button>
         </SimpleTooltip>
 
         <Select value={groupBy} onValueChange={(v) => setGroupBy(v as HistoryGroup)}>
-          <SelectTrigger className="h-9 w-[150px] rounded-full text-xs" aria-label={t('gallery.group.label')}>
+          <SelectTrigger
+            className="h-9 w-[150px] rounded-full text-xs"
+            aria-label={t('gallery.group.label')}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -248,10 +315,20 @@ export function GalleryToolbar({
           onChange={setView}
           aria-label={t('gallery.view.label')}
           options={[
-            { value: 'grid', label: <LayoutGrid className="h-3.5 w-3.5" />, title: t('gallery.view.grid') },
-            { value: 'list', label: <List className="h-3.5 w-3.5" />, title: t('gallery.view.list') },
+            {
+              value: 'grid',
+              label: <LayoutGrid className="h-3.5 w-3.5" />,
+              title: t('gallery.view.grid'),
+            },
+            {
+              value: 'list',
+              label: <List className="h-3.5 w-3.5" />,
+              title: t('gallery.view.list'),
+            },
           ]}
         />
+
+        <GalleryOutputFolder />
 
         <SimpleTooltip content={t('gallery.select.toggle')}>
           <button
@@ -261,7 +338,9 @@ export function GalleryToolbar({
             aria-label={t('gallery.select.toggle')}
             className={cn(
               'flex h-9 w-9 items-center justify-center rounded-full transition-colors',
-              selectionMode ? 'bg-accent text-accent-foreground' : 'bg-muted/60 text-muted-foreground hover:text-foreground',
+              selectionMode
+                ? 'bg-accent text-accent-foreground'
+                : 'bg-muted/60 text-muted-foreground hover:text-foreground',
             )}
           >
             <ListChecks className="h-4 w-4" />

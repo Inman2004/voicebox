@@ -19,6 +19,7 @@ import type { EngineParameter } from '@/lib/api/types';
 import { useGenerationPresets } from '@/lib/hooks/useGenerationPresets';
 import { useSession } from '../useGenerateSession';
 import { DEFAULT_SPEED, useRailSettings } from './useRailSettings';
+import { DecoderControl } from './DecoderControl';
 
 function formatParam(param: EngineParameter, value: number) {
   return param.unit === 'x' ? `${value.toFixed(2)}x` : `${value}${param.unit}`;
@@ -57,7 +58,9 @@ function ParamKnob({
           {note && <span className="mt-1 block text-muted-foreground">{note}</span>}
         </HelpHint>
       </div>
-      <span className="text-xs tabular-nums text-muted-foreground">{formatParam(param, draft)}</span>
+      <span className="text-xs tabular-nums text-muted-foreground">
+        {formatParam(param, draft)}
+      </span>
     </div>
   );
 }
@@ -106,9 +109,15 @@ export function ParametersSection() {
                 <RailAction icon={Save}>{t('generate.params.presets')}</RailAction>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel className="text-xs">{t('generate.params.presetsHint')}</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-xs">
+                  {t('generate.params.presetsHint')}
+                </DropdownMenuLabel>
                 {presets.map((p) => (
-                  <DropdownMenuItem key={p.id} onSelect={() => rail.applyPreset(p.settings)} className="group">
+                  <DropdownMenuItem
+                    key={p.id}
+                    onSelect={() => rail.applyPreset(p.settings)}
+                    className="group"
+                  >
                     <span className="flex-1 truncate">{p.name}</span>
                     {p.id === activePresetId && <Check className="h-3.5 w-3.5 text-accent" />}
                     {!p.is_builtin && (
@@ -136,7 +145,10 @@ export function ParametersSection() {
             </DropdownMenu>
             {/* Anchor for the "save preset" popover, opened from the menu. */}
             <PopoverTrigger asChild>
-              <span className="pointer-events-none absolute right-0 top-full h-0 w-0" aria-hidden="true" />
+              <span
+                className="pointer-events-none absolute right-0 top-full h-0 w-0"
+                aria-hidden="true"
+              />
             </PopoverTrigger>
             <PopoverContent align="end" className="w-64 space-y-2 p-3">
               <p className="text-xs font-medium">{t('generate.params.saveCurrent')}</p>
@@ -159,7 +171,9 @@ export function ParametersSection() {
               </Button>
             </PopoverContent>
           </Popover>
-          <RailAction onClick={() => rail.setSpeed(DEFAULT_SPEED)}>{t('generate.reset')}</RailAction>
+          <RailAction onClick={() => rail.setSpeed(DEFAULT_SPEED)}>
+            {t('generate.reset')}
+          </RailAction>
         </div>
       }
     >
@@ -180,6 +194,11 @@ export function ParametersSection() {
           />
         ))}
       </div>
+      {engine?.engine === 'qwen_custom_voice' && (
+        <div className="mt-4 border-t border-border/50 pt-4">
+          <DecoderControl />
+        </div>
+      )}
     </RailSection>
   );
 }

@@ -74,6 +74,10 @@ def _migrate_generation_settings(engine, inspector, tables: set[str]) -> None:
         _add_column(engine, "generation_settings", "preprocessing_json TEXT", "preprocessing_json")
     if "postprocessing_json" not in columns:
         _add_column(engine, "generation_settings", "postprocessing_json TEXT", "postprocessing_json")
+    if "qwen_execution_json" not in columns:
+        _add_column(engine, "generation_settings", "qwen_execution_json TEXT", "qwen_execution_json")
+    if "output_dir" not in columns:
+        _add_column(engine, "generation_settings", "output_dir TEXT", "output_dir")
 
 
 def _migrate_story_items(engine, inspector, tables: set[str]) -> None:
@@ -208,6 +212,8 @@ def _migrate_generations(engine, inspector, tables: set[str]) -> None:
         ("completed_at DATETIME", "completed_at"),
         ("load_seconds FLOAT", "load_seconds"),
         ("generation_seconds FLOAT", "generation_seconds"),
+        ("diagnostics JSON", "diagnostics"),
+        ("file_size INTEGER", "file_size"),
     ):
         if label not in columns:
             _add_column(engine, "generations", column_sql, label)

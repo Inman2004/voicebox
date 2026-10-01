@@ -170,3 +170,53 @@ function floatTo16BitPCM(view: DataView, offset: number, input: Float32Array): v
     view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
   }
 }
+
+/** Waveform bars per channel handed to WaveSurfer (min and max of each bucket). */
+const WAVEFORM_BUCKETS = 4000;
+let peaksContext: OfflineAudioContext | null = null;
+
+/**
+ * Download audio and compute waveform peaks without creating a Blob.
+ *
+ * WaveSurfer's own loader turns every file into a Blob. Chromium caps the Blob
+ * data a page may hold (spilling big blobs to disk, with a budget that shrinks
+ * as the disk fills), so after a few long tracks `response.blob()` starts
+ * failing with "Failed to fetch" even though the server answered 200.
+ * Passing precomputed peaks makes WaveSurfer skip that path; its WebAudio
+ * player then streams the URL into an ArrayBuffer (served from the HTTP cache).
+ */
+export async function loadWaveformPeaks(
+  url: string,
+  signal?: AbortSignal,
+): Promise<{ peaks: Float32Array[]; duration: number }> {
+  const response = await fetch(url, { signal });
+  if (!response.ok) {
+    throw new Error(`Failed to load audio: ${response.status} ${response.statusText}`);
+  }
+  const data = await response.arrayBuffer();
+  // Offline context: decoding needs no audio device and one instance is reused.
+  peaksContext ??= new OfflineAudioContext(1, 1, 44100);
+  const buffer = await peaksContext.decodeAudioData(data);
+
+  const peaks: Float32Array[] = [];
+  for (let ch = 0; ch < Math.min(buffer.numberOfChannels, 2); ch++) {
+    const samples = buffer.getChannelData(ch);
+    const buckets = Math.min(WAVEFORM_BUCKETS, samples.length);
+    const size = samples.length / buckets;
+    const out = new Float32Array(buckets * 2);
+    for (let b = 0; b < buckets; b++) {
+      let min = 0;
+      let max = 0;
+      const end = Math.min(samples.length, Math.floor((b + 1) * size));
+      for (let i = Math.floor(b * size); i < end; i++) {
+        const v = samples[i];
+        if (v > max) max = v;
+        else if (v < min) min = v;
+      }
+      out[b * 2] = max;
+      out[b * 2 + 1] = min;
+    }
+    peaks.push(out);
+  }
+  return { peaks, duration: buffer.duration };
+}

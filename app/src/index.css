@@ -49,13 +49,14 @@
   --card-foreground: 0 0% 5%;
   --popover: 0 0% 97%;
   --popover-foreground: 0 0% 5%;
-  --primary: 43 55% 58%;
+  /* Accent = magenta by default; other choices override below (html[data-accent]). */
+  --primary: 322 80% 52%;
   --primary-foreground: 0 0% 100%;
   --secondary: 0 0% 92%;
   --secondary-foreground: 0 0% 11%;
   --muted: 0 0% 90%;
   --muted-foreground: 0 0% 47%;
-  --accent: 43 55% 58%;
+  --accent: 322 80% 52%;
   --accent-foreground: 0 0% 100%;
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
@@ -84,8 +85,8 @@
   --secondary-foreground: 0 0% 95%;
   --muted: 0 0% 12%;
   --muted-foreground: 0 0% 60%;
-  --accent: 43 50% 45%;
-  --accent-foreground: 0 0% 95%;
+  --accent: 322 75% 58%;
+  --accent-foreground: 0 0% 98%;
   --destructive: 0 62.8% 50%;
   --destructive-foreground: 0 0% 95%;
   --border: 0 0% 12%;
@@ -97,6 +98,32 @@
   --chart-3: 30 80% 55%;
   --chart-4: 280 65% 60%;
   --chart-5: 340 75% 55%;
+}
+
+/* Accent colour choices (Settings → General → Accent colour). */
+:root[data-accent='violet'] {
+  --primary: 265 75% 60%;
+  --accent: 265 75% 60%;
+}
+.dark[data-accent='violet'] {
+  --primary: 0 0% 18%;
+  --accent: 265 70% 66%;
+}
+:root[data-accent='purple'] {
+  --primary: 285 65% 50%;
+  --accent: 285 65% 50%;
+}
+.dark[data-accent='purple'] {
+  --primary: 0 0% 18%;
+  --accent: 285 60% 58%;
+}
+:root[data-accent='gold'] {
+  --primary: 43 55% 58%;
+  --accent: 43 55% 58%;
+}
+.dark[data-accent='gold'] {
+  --primary: 0 0% 18%;
+  --accent: 43 50% 45%;
 }
 
 @layer base {

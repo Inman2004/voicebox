@@ -11,7 +11,6 @@ import { EffectsTab } from '@/components/EffectsTab/EffectsTab';
 import { GalleryPage } from '@/components/Gallery/GalleryPage';
 import { MainEditor } from '@/components/MainEditor/MainEditor';
 import { ModelsTab } from '@/components/ModelsTab/ModelsTab';
-import { AboutPage } from '@/components/ServerTab/AboutPage';
 import { CapturesPage } from '@/components/ServerTab/CapturesPage';
 import { ChangelogPage } from '@/components/ServerTab/ChangelogPage';
 import { GeneralPage } from '@/components/ServerTab/GeneralPage';
@@ -47,34 +46,34 @@ function RootLayout() {
 
   return (
     <TooltipProvider delayDuration={300}>
-    <AppFrame>
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <Sidebar isMacOS={isMacOS()} />
+      <AppFrame>
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          <Sidebar isMacOS={isMacOS()} />
 
-        <main className="flex-1 ml-[var(--sidebar-width,5rem)] overflow-hidden flex flex-col transition-[margin] duration-200">
-          <div className="container mx-auto px-8 max-w-[1800px] h-full overflow-hidden flex flex-col">
-            <Outlet />
-          </div>
-        </main>
-      </div>
+          <main className="flex-1 ml-[var(--sidebar-width,5rem)] overflow-hidden flex flex-col transition-[margin] duration-200">
+            <div className="container mx-auto px-8 max-w-[1800px] h-full overflow-hidden flex flex-col">
+              <Outlet />
+            </div>
+          </main>
+        </div>
 
-      {/* Show download toasts for any active downloads (from anywhere) */}
-      {activeDownloads.map((download) => {
-        const displayName =
-          MODEL_DISPLAY_NAMES[download.model_name] ||
-          variantNames.get(download.model_name) ||
-          download.model_name;
-        return (
-          <DownloadToastRestorer
-            key={download.model_name}
-            modelName={download.model_name}
-            displayName={displayName}
-          />
-        );
-      })}
+        {/* Show download toasts for any active downloads (from anywhere) */}
+        {activeDownloads.map((download) => {
+          const displayName =
+            MODEL_DISPLAY_NAMES[download.model_name] ||
+            variantNames.get(download.model_name) ||
+            download.model_name;
+          return (
+            <DownloadToastRestorer
+              key={download.model_name}
+              modelName={download.model_name}
+              displayName={displayName}
+            />
+          );
+        })}
 
-      <Toaster />
-    </AppFrame>
+        <Toaster />
+      </AppFrame>
     </TooltipProvider>
   );
 }
@@ -203,12 +202,6 @@ const settingsLogsRoute = createRoute({
   component: LogsPage,
 });
 
-const settingsAboutRoute = createRoute({
-  getParentRoute: () => settingsRoute,
-  path: '/about',
-  component: AboutPage,
-});
-
 // Redirect old /server path to /settings
 const serverRedirectRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -235,7 +228,6 @@ const routeTree = rootRoute.addChildren([
     settingsGpuRoute,
     settingsLogsRoute,
     settingsChangelogRoute,
-    settingsAboutRoute,
   ]),
   serverRedirectRoute,
 ]);
