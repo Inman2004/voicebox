@@ -1,3 +1,4 @@
+import type { AudioExportFormat } from '@/stores/audioExportStore';
 import type { LanguageCode } from '@/lib/constants/languages';
 import { useServerStore } from '@/stores/serverStore';
 import type {
@@ -325,11 +326,11 @@ class ApiClient {
     return this.request('/history/bulk', { method: 'POST', body: JSON.stringify({ ids, action }) });
   }
 
-  async exportHistoryZip(ids: string[]): Promise<Blob> {
+  async exportHistoryZip(ids: string[], format: AudioExportFormat = 'wav'): Promise<Blob> {
     const response = await fetch(`${this.getBaseUrl()}/history/export-zip`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids }),
+      body: JSON.stringify({ ids, format }),
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: response.statusText }));
@@ -368,8 +369,8 @@ class ApiClient {
     return response.blob();
   }
 
-  async exportGenerationAudio(generationId: string): Promise<Blob> {
-    const url = `${this.getBaseUrl()}/history/${generationId}/export-audio`;
+  async exportGenerationAudio(generationId: string, format: AudioExportFormat = 'wav'): Promise<Blob> {
+    const url = `${this.getBaseUrl()}/history/${generationId}/export-audio?format=${format}`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -858,8 +859,8 @@ class ApiClient {
     });
   }
 
-  async exportStoryAudio(storyId: string): Promise<Blob> {
-    const url = `${this.getBaseUrl()}/stories/${storyId}/export-audio`;
+  async exportStoryAudio(storyId: string, format: AudioExportFormat = 'wav'): Promise<Blob> {
+    const url = `${this.getBaseUrl()}/stories/${storyId}/export-audio?format=${format}`;
     const response = await fetch(url);
 
     if (!response.ok) {

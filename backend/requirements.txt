@@ -75,3 +75,6 @@ Pillow>=10.0.0
 num2words>=0.5.13
 psutil>=5.9.0
 nvidia-ml-py>=12.0.0; sys_platform != "darwin"
+
+# Bundled audio export encoder
+imageio-ffmpeg>=0.6.0

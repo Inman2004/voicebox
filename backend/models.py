@@ -237,6 +237,7 @@ class HistoryBulkResponse(BaseModel):
 
 
 class HistoryExportZipRequest(BaseModel):
+    format: Literal["wav", "mp3", "m4a"] = "wav"
     ids: List[str] = Field(..., min_length=1, max_length=1000)
 
 

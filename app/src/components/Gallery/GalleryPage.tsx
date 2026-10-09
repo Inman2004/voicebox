@@ -1,3 +1,4 @@
+import { chooseAudioExportFormat } from '@/stores/audioExportStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, Download, Images, Loader2, Star, StarOff, Trash2, X } from 'lucide-react';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -162,7 +163,9 @@ export function GalleryPage() {
   async function downloadZip(ids: string[]) {
     setBusy('zip');
     try {
-      const blob = await apiClient.exportHistoryZip(ids);
+      const format = await chooseAudioExportFormat();
+      if (!format) return;
+      const blob = await apiClient.exportHistoryZip(ids, format);
       await platform.filesystem.saveFile(`voicebox-${ids.length}-clips.zip`, blob, [
         { name: 'ZIP archive', extensions: ['zip'] },
       ]);

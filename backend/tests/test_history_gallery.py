@@ -211,3 +211,24 @@ def test_output_folder_setting(tmp_path):
         assert reset["effective_output_dir"] == reset["default_output_dir"]
     finally:
         config.set_generations_dir(None)
+
+
+@pytest.mark.parametrize("format,media_type", [("wav", "audio/wav"), ("mp3", "audio/mpeg"), ("m4a", "audio/mp4")])
+def test_audio_export_formats(env, format, media_type):
+    client, ids = env
+    response = client.get(f"/history/{ids[0]}/export-audio", params={"format": format})
+    assert response.status_code == 200
+    assert response.headers["content-type"] == media_type
+    assert f".{format}" in response.headers["content-disposition"]
+    assert len(response.content) > 100
+    archive = client.post("/history/export-zip", json={"ids": [ids[0]], "format": format})
+    assert archive.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(archive.content)) as zf:
+        assert zf.namelist()[0].endswith(f".{format}")
+        assert zf.read(zf.namelist()[0]) == response.content
+
+
+def test_audio_export_rejects_unknown_format(env):
+    client, ids = env
+    assert client.get(f"/history/{ids[0]}/export-audio", params={"format": "exe"}).status_code == 422
+    assert client.post("/history/export-zip", json={"ids": [ids[0]], "format": "exe"}).status_code == 422

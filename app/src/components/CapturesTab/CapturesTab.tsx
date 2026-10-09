@@ -1,3 +1,4 @@
+import { chooseAudioExportFormat } from '@/stores/audioExportStore';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -335,13 +336,15 @@ export function CapturesTab() {
 
   const handleExportAudio = async () => {
     if (!selected) return;
+    const format = await chooseAudioExportFormat();
+    if (!format) return;
     try {
       const dest = await save({
-        defaultPath: `capture_${selected.id.slice(0, 8)}.wav`,
-        filters: [{ name: 'Audio', extensions: ['wav'] }],
+        defaultPath: `capture_${selected.id.slice(0, 8)}.${format}`,
+        filters: [{ name: 'Audio', extensions: [format] }],
       });
       if (!dest) return;
-      const res = await fetch(apiClient.getCaptureAudioUrl(selected.id));
+      const res = await fetch(`${apiClient.getCaptureAudioUrl(selected.id)}?format=${format}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const buf = new Uint8Array(await res.arrayBuffer());
       await writeFile(dest, buf);

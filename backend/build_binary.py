@@ -91,6 +91,8 @@ def build_server(cuda=False, rocm=False):
         args.extend(["--paths", str(qwen_tts_path)])
         logger.info("Using local qwen_tts source from: %s", qwen_tts_path)
 
+    args.extend(["--collect-all", "imageio_ffmpeg"])
+
     # Add common hidden imports
     args.extend(
         [

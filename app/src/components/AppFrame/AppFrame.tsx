@@ -1,3 +1,4 @@
+import { AudioExportDialog } from '@/components/AudioExportDialog';
 import { useRouterState } from '@tanstack/react-router';
 import { TitleBarDragRegion } from '@/components/TitleBarDragRegion';
 import { AudioKeepAlive } from '@/components/AudioPlayer/AudioKeepAlive';
@@ -28,6 +29,7 @@ export function AppFrame({ children }: AppFrameProps) {
     >
       <TitleBarDragRegion />
       <AudioKeepAlive />
+      <AudioExportDialog />
       {children}
       {showTrackEditor ? (
         <StoryTrackEditor storyId={story.id} items={story.items} />

@@ -7,3 +7,6 @@ soundfile
 librosa
 python-multipart
 huggingface_hub
+
+# Bundled audio export encoder
+imageio-ffmpeg>=0.6.0

@@ -1,4 +1,15 @@
 {
+  "audioExport": {
+    "title": "Premium Export Formats",
+    "description": "Export MP3 and M4A alongside WAV for direct sharing and delivery.",
+    "format": "Audio format",
+    "wavHint": "Original quality",
+    "wavDetail": "Uncompressed",
+    "mp3Hint": "Easy sharing",
+    "m4aHint": "Compact delivery",
+    "cancel": "Cancel",
+    "export": "Export {{format}}"
+},
   "common": {
     "cancel": "Cancel",
     "save": "Save",

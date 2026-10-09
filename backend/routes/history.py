@@ -3,13 +3,14 @@
 import io
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from .. import config, models
-from ..services import export_import, history
 from ..app import safe_content_disposition
 from ..database import Generation as DBGeneration, VoiceProfile as DBVoiceProfile, get_db
+from ..services import export_import, history
+from ..services.audio_export import MEDIA_TYPES, AudioExportFormat, encode_audio
 
 router = APIRouter()
 
@@ -98,11 +99,11 @@ async def export_history_zip(data: models.HistoryExportZipRequest, db: Session =
             if audio_path is None or not audio_path.is_file():
                 continue
             safe_text = "".join(c for c in gen.text[:30] if c.isalnum() or c in (" ", "-", "_")).strip() or "generation"
-            name = f"{safe_text}-{gen.id[:8]}{audio_path.suffix or '.wav'}"
+            name = f"{safe_text}-{gen.id[:8]}.{data.format}"
             if name in used_names:
-                name = f"{safe_text}-{gen.id}{audio_path.suffix or '.wav'}"
+                name = f"{safe_text}-{gen.id}.{data.format}"
             used_names.add(name)
-            zf.write(audio_path, arcname=name)
+            zf.writestr(name, await encode_audio(audio_path, data.format))
             written += 1
     if written == 0:
         raise HTTPException(status_code=404, detail="None of the selected generations have audio")
@@ -254,6 +255,7 @@ async def export_generation(
 @router.get("/history/{generation_id}/export-audio")
 async def export_generation_audio(
     generation_id: str,
+    format: AudioExportFormat = "wav",
     db: Session = Depends(get_db),
 ):
     """Export only the audio file from a generation."""
@@ -273,10 +275,11 @@ async def export_generation_audio(
         safe_text = "generation"
     # Append a short id so exports of similarly-worded generations don't collide
     # on the same filename (the first 30 chars are frequently identical).
-    filename = f"{safe_text}-{generation_id[:8]}.wav"
+    filename = f"{safe_text}-{generation_id[:8]}.{format}"
 
-    return FileResponse(
-        audio_path,
-        media_type="audio/wav",
+    audio_bytes = await encode_audio(audio_path, format)
+    return StreamingResponse(
+        io.BytesIO(audio_bytes),
+        media_type=MEDIA_TYPES[format],
         headers={"Content-Disposition": safe_content_disposition("attachment", filename)},
     )
