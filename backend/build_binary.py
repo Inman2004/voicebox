@@ -91,6 +91,8 @@ def build_server(cuda=False, rocm=False):
         args.extend(["--paths", str(qwen_tts_path)])
         logger.info("Using local qwen_tts source from: %s", qwen_tts_path)
 
+    args.extend(["--collect-all", "imageio_ffmpeg"])
+
     # Add common hidden imports
     args.extend(
         [
@@ -121,6 +123,12 @@ def build_server(cuda=False, rocm=False):
             "--hidden-import",
             "backend.backends.qwen_custom_voice_backend",
             "--hidden-import",
+            "backend.backends.qwen_attention",
+            "--hidden-import",
+            "backend.backends.qwen_fast_decode",
+            "--hidden-import",
+            "backend.services.inference_runtime",
+            "--hidden-import",
             "backend.utils.audio",
             "--hidden-import",
             "backend.utils.cache",
@@ -138,6 +146,20 @@ def build_server(cuda=False, rocm=False):
             "backend.services.versions",
             "--hidden-import",
             "pedalboard",
+            # Generate rail: resource monitor + smart-number preprocessing.
+            # num2words imports its per-language modules dynamically.
+            "--hidden-import",
+            "psutil",
+            "--hidden-import",
+            "pynvml",
+            "--collect-submodules",
+            "num2words",
+            # Bundled avatars for built-in voices (services/voice_catalog.py)
+            "--add-data",
+            f"{backend_dir / 'voices' / 'avatars'}{os.pathsep}backend{os.sep}voices{os.sep}avatars",
+            # Bundled preview clips for built-in voices
+            "--add-data",
+            f"{backend_dir / 'voices' / 'samples'}{os.pathsep}backend{os.sep}voices{os.sep}samples",
             "--hidden-import",
             "chatterbox",
             "--hidden-import",

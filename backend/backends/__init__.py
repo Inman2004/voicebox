@@ -12,6 +12,7 @@ and a model config registry that eliminates per-engine dispatch maps.
 # HF_HUB_OFFLINE=1 and on network failures.
 from ..utils import hf_offline_patch  # noqa: F401
 
+import logging
 import threading
 from dataclasses import dataclass, field
 from typing import Protocol, Optional, Tuple, List
@@ -22,6 +23,8 @@ DEFAULT_LLM_MAX_TOKENS = 512
 DEFAULT_LLM_TEMPERATURE = 0.7
 
 from ..utils.platform_detect import get_backend_type
+
+logger = logging.getLogger(__name__)
 
 LANGUAGE_CODE_TO_NAME = {
     "zh": "chinese",
@@ -221,6 +224,143 @@ TTS_ENGINES = {
 LLM_ENGINES = {
     "qwen_llm": "Qwen3 LLM",
 }
+
+
+@dataclass
+class EngineParameter:
+    """A user-tunable generation parameter exposed by an engine."""
+
+    key: str
+    label: str
+    min: float
+    max: float
+    step: float
+    default: float
+    unit: str = ""
+    help: str = ""
+
+
+SPEED_PARAMETER = EngineParameter(
+    key="speed",
+    label="Speed",
+    min=0.5,
+    max=2.0,
+    step=0.05,
+    default=1.0,
+    unit="x",
+    help="Playback rate of the generated speech. 1.0 is the model's natural pace.",
+)
+
+
+@dataclass
+class EngineInfo:
+    """UI-facing metadata for a TTS engine (shared by every model size)."""
+
+    engine: str
+    display_name: str
+    tagline: str
+    description: str
+    icon: str  # lucide icon name, resolved on the frontend
+    color: str  # hex accent used for the engine badge
+    supports_cloning: bool = False
+    supports_presets: bool = False
+    supports_instruct: bool = False
+    supports_tags: bool = False
+    # True when the engine exposes a native speed control; otherwise speed
+    # is applied after synthesis with a pitch-preserving time stretch.
+    native_speed: bool = False
+    speed_rating: int = 2  # 1 (slow) .. 3 (fast), used by "Help me select"
+    quality_rating: int = 2  # 1 .. 3
+    parameters: list[EngineParameter] = field(default_factory=lambda: [SPEED_PARAMETER])
+
+
+TTS_ENGINE_INFO: dict[str, EngineInfo] = {
+    "kokoro": EngineInfo(
+        engine="kokoro",
+        display_name="Kokoro",
+        tagline="Fast multilingual voices",
+        description="Low-latency local narration with 50+ built-in voices. Runs well on CPU.",
+        icon="volume-2",
+        color="#e11d48",
+        supports_presets=True,
+        native_speed=True,
+        speed_rating=3,
+        quality_rating=2,
+    ),
+    "qwen_custom_voice": EngineInfo(
+        engine="qwen_custom_voice",
+        display_name="Qwen CustomVoice",
+        tagline="Built-in speakers with style control",
+        description="Premium preset speakers that follow natural-language delivery instructions.",
+        icon="sliders-horizontal",
+        color="#7c3aed",
+        supports_presets=True,
+        supports_instruct=True,
+        speed_rating=1,
+        quality_rating=3,
+    ),
+    "qwen": EngineInfo(
+        engine="qwen",
+        display_name="Qwen TTS",
+        tagline="High-fidelity voice cloning",
+        description="Clone any voice from a few seconds of audio across 10 languages.",
+        icon="audio-lines",
+        color="#2563eb",
+        supports_cloning=True,
+        speed_rating=1,
+        quality_rating=3,
+    ),
+    "chatterbox": EngineInfo(
+        engine="chatterbox",
+        display_name="Chatterbox Multilingual",
+        tagline="Expressive cloning in 23 languages",
+        description="Multilingual expressive speech and voice cloning.",
+        icon="sparkles",
+        color="#9333ea",
+        supports_cloning=True,
+        speed_rating=2,
+        quality_rating=3,
+    ),
+    "chatterbox_turbo": EngineInfo(
+        engine="chatterbox_turbo",
+        display_name="Chatterbox Turbo",
+        tagline="Expressive English with tags",
+        description="Expressive English speech with [laugh], [sigh] and other paralinguistic tags.",
+        icon="sparkles",
+        color="#a855f7",
+        supports_cloning=True,
+        supports_tags=True,
+        speed_rating=2,
+        quality_rating=3,
+    ),
+    "luxtts": EngineInfo(
+        engine="luxtts",
+        display_name="LuxTTS",
+        tagline="Fast, CPU-friendly cloning",
+        description="Lightweight English voice cloning that runs quickly without a GPU.",
+        icon="zap",
+        color="#0d9488",
+        supports_cloning=True,
+        native_speed=True,
+        speed_rating=3,
+        quality_rating=1,
+    ),
+    "tada": EngineInfo(
+        engine="tada",
+        display_name="TADA",
+        tagline="Long-form expressive cloning",
+        description="Hume's text-acoustic model for natural long-form narration.",
+        icon="cpu",
+        color="#ea580c",
+        supports_cloning=True,
+        speed_rating=1,
+        quality_rating=3,
+    ),
+}
+
+
+def get_engine_info(engine: str) -> Optional[EngineInfo]:
+    return TTS_ENGINE_INFO.get(engine)
 
 
 def _get_qwen_model_configs() -> list[ModelConfig]:
@@ -635,6 +775,51 @@ def check_model_loaded(config: ModelConfig) -> bool:
         return backend.is_loaded()
     except Exception:
         return False
+
+
+def _is_instantiated(config: ModelConfig) -> bool:
+    """Whether a backend object for this config exists (never creates one)."""
+    if config.engine == "whisper":
+        return _stt_backend is not None
+    if config.engine == "qwen_llm":
+        return config.engine in _llm_backends
+    if config.engine == "qwen":
+        return _tts_backend is not None or config.engine in _tts_backends
+    return config.engine in _tts_backends
+
+
+def free_vram_for(engine: str, needed_mb: float) -> list[str]:
+    """Unload other resident models when free CUDA memory is below *needed_mb*.
+
+    On small GPUs (e.g. 4 GB) a model left loaded by another engine pushes
+    the next load past dedicated VRAM, and the Windows driver then silently
+    spills allocations into shared system RAM. Only models that are already
+    loaded are considered, and nothing is unloaded while there is room.
+    Returns the names of the models that were unloaded.
+    """
+    import torch
+
+    if not torch.cuda.is_available():
+        return []
+    free_mb = torch.cuda.mem_get_info()[0] / (1024 * 1024)
+    if free_mb >= needed_mb:
+        return []
+    unloaded = []
+    for config in get_all_model_configs():
+        if config.engine == engine or not _is_instantiated(config):
+            continue
+        try:
+            if check_model_loaded(config) and unload_model_by_config(config):
+                unloaded.append(config.model_name)
+        except Exception as e:  # a busy model stays loaded; the load reports OOM if it matters
+            logger.warning("Could not unload %s to free VRAM: %s", config.model_name, e)
+    if unloaded:
+        torch.cuda.empty_cache()
+        logger.info(
+            "Freed VRAM for %s (needed %.0f MB, had %.0f MB free): unloaded %s",
+            engine, needed_mb, free_mb, ", ".join(unloaded),
+        )
+    return unloaded
 
 
 def get_model_load_func(config: ModelConfig):

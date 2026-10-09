@@ -15,11 +15,15 @@ Languages supported: zh, en, ja, ko, de, fr, ru, pt, es, it
 """
 
 import asyncio
+import gc
 import logging
+import threading
+import time
 from typing import Optional
 
 import numpy as np
 import torch
+from ..services import inference_runtime as runtime
 
 from . import TTSBackend, LANGUAGE_CODE_TO_NAME
 from .base import (
@@ -48,6 +52,10 @@ QWEN_CUSTOM_VOICES = [
 
 QWEN_CV_DEFAULT_SPEAKER = "Ryan"
 
+# CUDA memory a load needs, in MB: measured peak allocation during generation
+# (bf16, RTX 3050: 0.6B = 2.05 GB resident, ~2.7 GB peak) plus headroom.
+QWEN_CV_VRAM_MB = {"0.6B": 3000, "1.7B": 5200}
+
 # HuggingFace repo IDs per model size
 QWEN_CV_HF_REPOS = {
     "1.7B": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
@@ -63,6 +71,10 @@ class QwenCustomVoiceBackend:
         self.model_size = model_size
         self.device = self._get_device()
         self._current_model_size: Optional[str] = None
+        self._execution_config = None
+        self._fast_decoder = None
+        self._execution_guard = threading.RLock()
+        self._peak_request = None
 
     def _get_device(self) -> str:
         return get_torch_device(allow_xpu=True, allow_directml=True)
@@ -83,18 +95,69 @@ class QwenCustomVoiceBackend:
         if model_size is None:
             model_size = self.model_size
 
-        if self.model is not None and self._current_model_size == model_size:
-            return
-
-        if self.model is not None and self._current_model_size != model_size:
-            self.unload_model()
-
-        await asyncio.to_thread(self._load_model_sync, model_size)
+        await runtime.finish_thread(self._load_model_sync, model_size)
 
     # Alias for compatibility with the TTSBackend protocol
     load_model = load_model_async
 
     def _load_model_sync(self, model_size: str) -> None:
+        with self._execution_guard:
+            self._load_locked(model_size)
+
+    def _load_locked(self, model_size: str) -> None:
+        request_id = runtime.REQUEST_ID.get()
+        if request_id and request_id != self._peak_request:
+            if torch.cuda.is_initialized():
+                torch.cuda.reset_peak_memory_stats()
+            self._peak_request = request_id
+        options = runtime.OPTIONS.get() or runtime.saved_options()
+        mode, precision = options["mode"], options["precision"]
+        device = "cpu" if mode == "cpu" else self._get_device()
+        if mode == "cuda_only":
+            if not torch.cuda.is_available():
+                runtime.publish(actual="unverified", stage="failed", failure={"code": "cuda_unavailable", "message": "CUDA Only requires a CUDA-enabled PyTorch runtime and GPU."})
+                raise RuntimeError("CUDA Only requires a CUDA-enabled PyTorch runtime and GPU.")
+            device = "cuda:0"
+        dtype = torch.float32 if device == "cpu" else (torch.float16 if precision == "fp16" else torch.bfloat16)
+        efficient = bool(options.get("efficient_attention", False)) and device.startswith("cuda")
+        desired = (model_size, device, dtype, mode, efficient)
+        if self.model is not None and self._execution_config == desired:
+            return
+        self._unload_locked()
+        self.device = device
+        runtime.publish(stage="loading", requested=mode, actual="unverified", active=True,
+                        model=f"qwen-custom-voice-{model_size}", dtype=str(dtype).removeprefix("torch."),
+                        failure=None, components=[], memory=runtime.cuda_memory(device))
+        started = time.perf_counter()
+        try:
+            if device.startswith("cuda"):
+                from . import free_vram_for
+
+                evicted = free_vram_for("qwen_custom_voice", QWEN_CV_VRAM_MB.get(model_size, 3000))
+                if evicted:
+                    runtime.publish(evicted_models=evicted)
+            self._load_weights(model_size, dtype, explicit=mode == "cuda_only")
+            if efficient:
+                from .qwen_attention import install
+                install(self.model)
+            if device.startswith("cuda"):
+                from .qwen_fast_decode import FastTalkerDecoder
+
+                self._fast_decoder = FastTalkerDecoder.install(self.model.model)
+            rows = runtime.inspect_components(self.model)
+            if mode == "cuda_only" and runtime.execution_state(rows) != "cuda":
+                raise runtime.RuntimePlacementError("CUDA Only rejected model components outside CUDA.")
+            self._execution_config = desired
+            runtime.publish(stage="loaded", actual="unverified", placement=runtime.execution_state(rows),
+                            components=rows, load_seconds=time.perf_counter() - started,
+                            attention="sdpa_repeat_kv" if efficient else getattr(self.model.model.config, "_attn_implementation", None),
+                            memory=runtime.cuda_memory(device), active=False)
+        except Exception as error:
+            self._report_failure(error)
+            self._unload_locked()
+            raise
+
+    def _load_weights(self, model_size, dtype, explicit=False):
         model_name = f"qwen-custom-voice-{model_size}"
         is_cached = self._is_model_cached(model_size)
 
@@ -107,14 +170,15 @@ class QwenCustomVoiceBackend:
             if self.device == "cpu":
                 self.model = Qwen3TTSModel.from_pretrained(
                     model_path,
-                    torch_dtype=torch.float32,
+                    torch_dtype=dtype,
                     low_cpu_mem_usage=False,
                 )
             else:
                 self.model = Qwen3TTSModel.from_pretrained(
                     model_path,
                     device_map=self.device,
-                    torch_dtype=torch.bfloat16,
+                    torch_dtype=dtype,
+                    **({"attn_implementation": "sdpa"} if explicit else {}),
                 )
 
         self._current_model_size = model_size
@@ -122,15 +186,36 @@ class QwenCustomVoiceBackend:
         logger.info("Qwen CustomVoice %s loaded successfully", model_size)
 
     def unload_model(self) -> None:
+        # UI/API unload is synchronous: never block the event loop behind inference.
+        if not self._execution_guard.acquire(blocking=False):
+            raise runtime.RuntimeBusyError("Qwen is busy. Cancel or wait for generation before unloading.")
+        try:
+            self._unload_locked()
+            runtime.publish(stage="unloaded", active=False, actual="unverified", components=[], memory=None)
+        finally:
+            self._execution_guard.release()
+
+    def _unload_locked(self):
+        if self._fast_decoder is not None:
+            self._fast_decoder.uninstall()
+            self._fast_decoder = None
         if self.model is not None:
             del self.model
             self.model = None
             self._current_model_size = None
+            self._execution_config = None
 
+            gc.collect()  # anything still cyclic (HF hooks, caches) must go before empty_cache
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
             logger.info("Qwen CustomVoice unloaded")
+
+    def _report_failure(self, error):
+        oom = isinstance(error, torch.cuda.OutOfMemoryError)
+        runtime.publish(stage="failed", actual="cuda_oom" if oom else "unverified", active=False,
+                        memory=runtime.cuda_memory(self.device),
+                        failure={"code": "cuda_oom" if oom else "execution_error", "message": str(error)})
 
     async def create_voice_prompt(
         self,
@@ -181,8 +266,6 @@ class QwenCustomVoiceBackend:
         Returns:
             Tuple of (audio_array, sample_rate)
         """
-        await self.load_model_async(None)
-
         speaker = voice_prompt.get("preset_voice_id") or QWEN_CV_DEFAULT_SPEAKER
 
         def _generate_sync():
@@ -207,8 +290,57 @@ class QwenCustomVoiceBackend:
             # state. Forcing offline here (issue #462) regressed online
             # users whose libraries issue legitimate metadata lookups
             # during generation.
-            wavs, sample_rate = self.model.generate_custom_voice(**kwargs)
+            started = time.perf_counter()
+            config = self._execution_config
+            runtime.publish(stage="generating", active=True, speaker=speaker,
+                            memory=runtime.cuda_memory(self.device), failure=None,
+                            dtype=str(config[2]).removeprefix("torch.") if config else None,
+                            attention="sdpa_repeat_kv" if config and config[4]
+                            else getattr(self.model.model.config, "_attn_implementation", None))
+            options = runtime.OPTIONS.get() or {}
+            decoder = self._fast_decoder
+            if decoder is not None:
+                decoder.enabled = bool(options.get("fast_decode", True))
+            with runtime.ObserveExecution(self.model, strict=options.get("mode") == "cuda_only") as observed:
+                wavs, sample_rate = self.model.generate_custom_voice(**kwargs)
+                decode = decoder.last_run if decoder is not None else None
+                if decode is not None and decode.path == "cuda_graph":
+                    # Only the predictor bypasses hooks. The stock talker's
+                    # device is observed normally, not inferred from this graph.
+                    observed.mark_executed(("talker.code_predictor",),
+                                           str(self.device))
+            elapsed = time.perf_counter() - started
+            if decode is not None:
+                runtime.publish(decoder={
+                    "path": decode.path, "reason": decode.reason, "frames": decode.frames,
+                    "frames_per_second": decode.frames_per_s, "capture_seconds": decode.capture_s,
+                    "static_cache_bytes": decoder.static_bytes(),
+                    "strategy": decode.extra.get("strategy"),
+                })
+            runtime.publish(stage="audio_ready", active=False, generation_seconds=elapsed,
+                            audio_seconds=len(wavs[0]) / sample_rate,
+                            memory=runtime.cuda_memory(self.device))
             return wavs[0], sample_rate
 
-        audio, sample_rate = await asyncio.to_thread(_generate_sync)
+        def guarded():
+            with self._execution_guard:
+                try:
+                    options = runtime.OPTIONS.get() or runtime.saved_options()
+                    token = runtime.OPTIONS.set(options)
+                    try:
+                        self._load_locked(options.get("model_size") or self.model_size)
+                        return _generate_sync()
+                    finally:
+                        runtime.OPTIONS.reset(token)
+                        # Return cached-but-unused blocks to the driver. On a 4 GB
+                        # card PyTorch's cache otherwise grows run over run
+                        # (measured 2.9 → 3.3 GB reserved) until Windows starts
+                        # spilling into shared system memory.
+                        if str(self.device).startswith("cuda"):
+                            torch.cuda.empty_cache()
+                except Exception as error:
+                    self._report_failure(error)
+                    raise
+
+        audio, sample_rate = await runtime.finish_thread(guarded)
         return audio, sample_rate

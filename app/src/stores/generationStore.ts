@@ -1,6 +1,24 @@
 import { create } from 'zustand';
+import type { InferenceDiagnostics } from '@/lib/api/types';
+
+/** Latest SSE status for a generation — drives live timers and metadata. */
+export interface LiveGenerationStatus {
+  diagnostics?: InferenceDiagnostics | null;
+  id: string;
+  status: 'loading_model' | 'generating' | 'completed' | 'failed' | 'not_found';
+  created_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  load_seconds?: number | null;
+  generation_seconds?: number | null;
+  duration?: number | null;
+  error?: string | null;
+}
 
 interface GenerationState {
+  /** Most recent status event per generation id (kept after completion). */
+  liveStatus: Record<string, LiveGenerationStatus>;
+  setLiveStatus: (status: LiveGenerationStatus) => void;
   /** IDs of generations currently in progress */
   pendingGenerationIds: Set<string>;
   /** Whether any generation is in progress (derived from pendingGenerationIds) */
@@ -16,6 +34,9 @@ interface GenerationState {
 }
 
 export const useGenerationStore = create<GenerationState>((set, get) => ({
+  liveStatus: {},
+  setLiveStatus: (status) =>
+    set((state) => ({ liveStatus: { ...state.liveStatus, [status.id]: status } })),
   pendingGenerationIds: new Set(),
   isGenerating: false,
   activeGenerationId: null,

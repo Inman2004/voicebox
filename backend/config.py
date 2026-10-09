@@ -21,6 +21,9 @@ if _custom_models_dir:
 # Default data directory (used in development)
 _data_dir = Path("data").resolve()
 
+# User-chosen folder for generated audio (None = <data dir>/generations).
+_generations_dir_override: Path | None = None
+
 
 def _path_relative_to_any_data_dir(path: Path) -> Path | None:
     """Extract the path within a data dir from an absolute or relative path."""
@@ -63,6 +66,12 @@ def get_data_dir() -> Path:
 def to_storage_path(path: str | Path) -> str:
     """Convert a filesystem path to a DB-safe path relative to the data dir."""
     resolved_path = Path(path).resolve()
+
+    # Files in a custom output folder live outside the data dir: store them
+    # absolute (and before the "data" heuristic below, which would misread a
+    # folder like "D:/data/voice" as being inside the data dir).
+    if _generations_dir_override is not None and resolved_path.is_relative_to(_generations_dir_override):
+        return str(resolved_path)
 
     relative_to_any_data_dir = _path_relative_to_any_data_dir(resolved_path)
     if relative_to_any_data_dir is not None:
@@ -117,11 +126,39 @@ def get_profiles_dir() -> Path:
     return path
 
 
+def get_default_generations_dir() -> Path:
+    """The built-in location for generated audio."""
+    return _data_dir / "generations"
+
+
 def get_generations_dir() -> Path:
-    """Get generations directory path."""
-    path = _data_dir / "generations"
+    """Get generations directory path (the user's output folder if set)."""
+    path = _generations_dir_override or get_default_generations_dir()
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def validate_output_dir(path: str | Path) -> Path:
+    """Check a user-chosen output folder: absolute, creatable and writable."""
+    folder = Path(path).expanduser()
+    if not folder.is_absolute():
+        raise ValueError("Choose a full folder path, for example D:/Voice Outputs.")
+    folder = folder.resolve()
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        probe = folder / ".voicebox-write-test"
+        probe.write_bytes(b"")
+        probe.unlink()
+    except OSError as e:
+        raise ValueError(f"Can't write to {folder}: {e.strerror or e}") from e
+    return folder
+
+
+def set_generations_dir(path: str | Path | None) -> None:
+    """Send new generated audio to *path* (None restores the default)."""
+    global _generations_dir_override
+    _generations_dir_override = validate_output_dir(path) if path else None
+    logger.info("Generated audio folder: %s", get_generations_dir())
 
 
 def get_captures_dir() -> Path:

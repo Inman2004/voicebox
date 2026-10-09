@@ -11,6 +11,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from .. import config
 from ..database import CaptureSettings as DBCaptureSettings
 from ..database import GenerationSettings as DBGenerationSettings
 from ..utils.capture_chords import (
@@ -88,3 +89,102 @@ def update_generation_settings(db: Session, patch: dict[str, Any]) -> DBGenerati
     db.commit()
     db.refresh(row)
     return row
+
+
+# --- Generation rail defaults (speed + text/audio processing) ---------------
+
+
+def _load_json(raw: Any) -> dict:
+    import json
+
+    if not raw:
+        return {}
+    try:
+        value = json.loads(raw)
+        return value if isinstance(value, dict) else {}
+    except (TypeError, ValueError):
+        return {}
+
+
+def generation_settings_to_response(row: DBGenerationSettings):
+    """Build the API response, decoding the JSON option columns."""
+    from .. import models
+
+    return models.GenerationSettingsResponse(
+        max_chunk_chars=row.max_chunk_chars,
+        crossfade_ms=row.crossfade_ms,
+        normalize_audio=row.normalize_audio,
+        autoplay_on_generate=row.autoplay_on_generate,
+        speed=row.speed if row.speed is not None else 1.0,
+        preprocessing=models.PreprocessingOptions.model_validate(_load_json(row.preprocessing_json)),
+        postprocessing=_postprocessing_from_row(row),
+        qwen_execution=models.QwenExecutionOptions.model_validate(_load_json(row.qwen_execution_json)),
+        output_dir=row.output_dir,
+        effective_output_dir=str(config.get_generations_dir()),
+        default_output_dir=str(config.get_default_generations_dir()),
+    )
+
+
+def _postprocessing_from_row(row: DBGenerationSettings):
+    from .. import models
+
+    if row.postprocessing_json:
+        return models.PostprocessingOptions.model_validate(_load_json(row.postprocessing_json))
+    # Never saved from the rail yet: honour the legacy normalize toggle.
+    options = models.PostprocessingOptions()
+    if not row.normalize_audio:
+        options = options.model_copy(update={"loudness": "off"})
+    return options
+
+
+def update_generation_settings_from_request(db: Session, update) -> DBGenerationSettings:
+    """Apply a ``GenerationSettingsUpdate``, encoding nested options as JSON."""
+    import json
+
+    patch = update.model_dump(exclude_unset=True, by_alias=True)
+    preprocessing = patch.pop("preprocessing", None)
+    postprocessing = patch.pop("postprocessing", None)
+    execution = patch.pop("qwen_execution", None)
+    if "output_dir" in patch:
+        # Validate and switch before saving; "" / null restores the default.
+        folder = (patch["output_dir"] or "").strip() or None
+        config.set_generations_dir(folder)  # raises ValueError if unusable
+        patch["output_dir"] = str(config.get_generations_dir()) if folder else None
+    if execution is not None:
+        patch["qwen_execution_json"] = json.dumps(execution)
+    if preprocessing is not None:
+        patch["preprocessing_json"] = json.dumps(preprocessing)
+    if postprocessing is not None:
+        patch["postprocessing_json"] = json.dumps(postprocessing)
+        # Keep the legacy flag in sync for older clients.
+        patch["normalize_audio"] = postprocessing.get("loudness", "off") != "off"
+    elif "normalize_audio" in patch:
+        # Legacy toggle (Settings → Generation) drives the loudness mode.
+        row = get_generation_settings(db)
+        if row.postprocessing_json:
+            current = _postprocessing_from_row(row).model_dump()
+            wants = bool(patch["normalize_audio"])
+            if wants != (current["loudness"] != "off"):
+                current["loudness"] = "broadcast" if wants else "off"
+                patch["postprocessing_json"] = json.dumps(current)
+    return update_generation_settings(db, patch)
+
+
+def resolve_generation_options(request, db: Session):
+    """Fill speed / preprocessing / postprocessing on a request from the
+    saved defaults when the caller omitted them.
+
+    Returns ``(speed, preprocessing, postprocessing)``. The legacy
+    ``normalize=False`` flag disables loudness when no explicit
+    postprocessing was sent.
+    """
+    defaults = generation_settings_to_response(get_generation_settings(db))
+
+    speed = request.speed if getattr(request, "speed", None) is not None else defaults.speed
+    preprocessing = getattr(request, "preprocessing", None) or defaults.preprocessing
+    postprocessing = getattr(request, "postprocessing", None)
+    if postprocessing is None:
+        postprocessing = defaults.postprocessing
+        if getattr(request, "normalize", True) is False:
+            postprocessing = postprocessing.model_copy(update={"loudness": "off"})
+    return speed, preprocessing, postprocessing

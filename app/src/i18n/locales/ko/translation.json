@@ -135,13 +135,13 @@
       },
       "inputMonitoring": {
         "label": "입력 모니터링 권한",
-        "ready": "macOS가 Voicebox의 전역 단축키 감지를 허용합니다.",
-        "missing": "macOS에서 Voicebox의 전역 단축키 감지를 허용해야 합니다.",
+        "ready": "macOS가 MagicVox의 전역 단축키 감지를 허용합니다.",
+        "missing": "macOS에서 MagicVox의 전역 단축키 감지를 허용해야 합니다.",
         "openSettings": "설정 열기"
       },
       "accessibility": {
         "label": "손쉬운 사용 권한",
-        "ready": "Voicebox가 다른 앱에 대본을 붙여넣을 수 있습니다.",
+        "ready": "MagicVox가 다른 앱에 대본을 붙여넣을 수 있습니다.",
         "missing": "대본을 포커스된 앱에 붙여넣는 데 필요합니다.",
         "openSettings": "설정 열기"
       }
@@ -149,19 +149,19 @@
     "permissions": {
       "accessibility": {
         "title": "자동 붙여넣기를 활성화하려면 손쉬운 사용 권한을 허용하세요",
-        "body": "Voicebox가 다른 앱에 대본을 붙여넣으려면 <path>시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용</path> 권한이 필요합니다. 권한이 없어도 받아쓰기는 캡처 탭에 저장됩니다.",
+        "body": "MagicVox가 다른 앱에 대본을 붙여넣으려면 <path>시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용</path> 권한이 필요합니다. 권한이 없어도 받아쓰기는 캡처 탭에 저장됩니다.",
         "openSettings": "설정 열기",
         "recheck": "활성화했습니다",
         "rechecking": "확인 중…",
-        "stillMissing": "아직 감지되지 않았습니다. macOS에서는 일반적으로 권한을 켠 후 Voicebox를 종료하고 다시 열어야 합니다."
+        "stillMissing": "아직 감지되지 않았습니다. macOS에서는 일반적으로 권한을 켠 후 MagicVox를 종료하고 다시 열어야 합니다."
       },
       "inputMonitoring": {
         "title": "전역 단축키를 활성화하려면 입력 모니터링을 허용하세요",
-        "body": "Voicebox가 받아쓰기 단축키를 감지하려면 <path>시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링</path> 권한이 필요합니다. 스위치가 켜져 있지만 macOS에서 키 이벤트를 차단하고 있습니다.",
+        "body": "MagicVox가 받아쓰기 단축키를 감지하려면 <path>시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링</path> 권한이 필요합니다. 스위치가 켜져 있지만 macOS에서 키 이벤트를 차단하고 있습니다.",
         "openSettings": "설정 열기",
         "recheck": "활성화했습니다",
         "rechecking": "확인 중…",
-        "stillMissing": "아직 감지되지 않았습니다. macOS에서는 일반적으로 권한을 켠 후 Voicebox를 종료하고 다시 열어야 합니다."
+        "stillMissing": "아직 감지되지 않았습니다. macOS에서는 일반적으로 권한을 켠 후 MagicVox를 종료하고 다시 열어야 합니다."
       }
     }
   },
@@ -390,28 +390,6 @@
       "updatedDescription": "참조 텍스트가 성공적으로 업데이트되었습니다.",
       "updateFailed": "업데이트 실패",
       "updateFailedFallback": "샘플 업데이트에 실패했습니다"
-    }
-  },
-  "profiles": {
-    "card": {
-      "noDescription": "설명 없음",
-      "designed": "디자인됨",
-      "export": "프로필 내보내기",
-      "edit": "프로필 편집",
-      "delete": "프로필 삭제",
-      "selectLabel": "{{name}}, {{language}}. 생성할 음성으로 선택하세요.",
-      "selectLabelSelected": "{{name}}, {{language}}. 생성할 음성으로 선택됨."
-    },
-    "list": {
-      "errorLoading": "프로필 로딩 오류: {{message}}",
-      "empty": "아직 음성 프로필이 없습니다. 첫 번째 프로필을 만들어 시작하세요.",
-      "createVoice": "음성 만들기",
-      "unsupportedNote": "현재 모델에서 지원되는 음성 프로필만 선택할 수 있습니다."
-    },
-    "deleteDialog": {
-      "title": "프로필 삭제",
-      "body": "\"{{name}}\"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
-      "deleting": "삭제 중…"
     }
   },
   "effects": {
@@ -748,7 +726,7 @@
     },
     "language": {
       "label": "언어",
-      "description": "Voicebox의 표시 언어를 선택하세요."
+      "description": "MagicVox의 표시 언어를 선택하세요."
     },
     "theme": {
       "label": "테마",
@@ -760,11 +738,16 @@
       }
     },
     "general": {
-      "docs": { "title": "문서 읽기" },
-      "discord": { "title": "Discord 참여하기", "subtitle": "도움말 & 음성 공유" },
+      "docs": {
+        "title": "문서 읽기"
+      },
+      "discord": {
+        "title": "Discord 참여하기",
+        "subtitle": "도움말 & 음성 공유"
+      },
       "serverUrl": {
         "title": "서버 URL",
-        "description": "voicebox 백엔드 서버 주소입니다.",
+        "description": "MagicVox 백엔드 서버 주소입니다.",
         "invalidUrl": "올바른 URL을 입력해 주세요",
         "updatedTitle": "서버 URL 업데이트됨",
         "updatedDescription": "{{url}}에 연결되었습니다"
@@ -819,7 +802,7 @@
       },
       "api": {
         "title": "API 액세스",
-        "description": "<code>{{url}}</code>에서 REST API를 통해 Voicebox를 워크플로우에 통합하세요.",
+        "description": "<code>{{url}}</code>에서 REST API를 통해 MagicVox를 워크플로우에 통합하세요.",
         "viewReference": "전체 API 참조 보기",
         "endpoints": {
           "generate": "음성 생성",
@@ -908,7 +891,7 @@
         },
         "autoPaste": {
           "title": "포커스된 텍스트 필드에 자동 붙여넣기",
-          "description": "다른 앱에서 텍스트 입력이 포커스되어 있으면 직접 붙여넣습니다. Voicebox가 클립보드 내용을 저장하고 복원합니다."
+          "description": "다른 앱에서 텍스트 입력이 포커스되어 있으면 직접 붙여넣습니다. MagicVox가 클립보드 내용을 저장하고 복원합니다."
         }
       },
       "transcription": {
@@ -916,7 +899,7 @@
         "description": "캡처에 사용할 음성-텍스트 모델을 선택하세요.",
         "model": {
           "title": "변환 모델",
-          "description": "Whisper가 Voicebox에 포함되어 있으며 기기에서 완전히 실행됩니다.",
+          "description": "Whisper가 MagicVox에 포함되어 있으며 기기에서 완전히 실행됩니다.",
           "base": "Whisper Base · 74M · {{tail}}",
           "small": "Whisper Small · 244M · {{tail}}",
           "medium": "Whisper Medium · 769M · {{tail}}",
@@ -992,7 +975,7 @@
       },
       "storage": {
         "title": "저장소",
-        "description": "캡처는 Voicebox 데이터 디렉토리에 오디오와 대본 파일 쌍으로 저장됩니다.",
+        "description": "캡처는 MagicVox 데이터 디렉토리에 오디오와 대본 파일 쌍으로 저장됩니다.",
         "retention": {
           "title": "보관 기간",
           "description": "캡처 보관 기간입니다. 오디오와 대본 모두에 적용됩니다.",
@@ -1009,7 +992,7 @@
       },
       "sidebar": {
         "aboutTitle": "캡처 정보",
-        "aboutBody": "어디서든 단축키를 누르고 말하면 Voicebox가 음성을 텍스트로 변환합니다. 복제된 음성으로 재생하고, 앱에 붙여넣고, 코딩 에이전트로 보내세요.",
+        "aboutBody": "어디서든 단축키를 누르고 말하면 MagicVox가 음성을 텍스트로 변환합니다. 복제된 음성으로 재생하고, 앱에 붙여넣고, 코딩 에이전트로 보내세요.",
         "differencesTitle": "차이점",
         "local": {
           "title": "완전 로컬.",
@@ -1025,14 +1008,14 @@
         },
         "windowsCaveat": {
           "title": "Windows 참고사항",
-          "body": "Voicebox 자체 또는 관리자 권한으로 실행 중인 앱이 포커스된 경우 단축키가 작동하지 않습니다. 개선 중입니다."
+          "body": "MagicVox 자체 또는 관리자 권한으로 실행 중인 앱이 포커스된 경우 단축키가 작동하지 않습니다. 개선 중입니다."
         }
       }
     },
     "mcp": {
       "install": {
         "title": "에이전트에 설치",
-        "description": "Voicebox는 앱이 열려 있을 때 로컬 MCP 서버를 제공합니다. 다음 중 하나를 에이전트의 MCP 설정에 붙여넣으세요.",
+        "description": "MagicVox는 앱이 열려 있을 때 로컬 MCP 서버를 제공합니다. 다음 중 하나를 에이전트의 MCP 설정에 붙여넣으세요.",
         "http": {
           "title": "HTTP (권장)",
           "description": "HTTP MCP를 사용하는 클라이언트용 — Claude Code, Cursor, Windsurf, VS Code."
@@ -1073,7 +1056,7 @@
       },
       "sidebar": {
         "aboutTitle": "MCP 정보",
-        "aboutBody": "Model Context Protocol을 통해 AI 코딩 에이전트(Claude Code, Cursor, Windsurf)가 Voicebox 도구를 호출할 수 있습니다. 복제된 음성으로 말하고, 오디오를 변환하고, 캡처를 탐색하세요.",
+        "aboutBody": "Model Context Protocol을 통해 AI 코딩 에이전트(Claude Code, Cursor, Windsurf)가 MagicVox 도구를 호출할 수 있습니다. 복제된 음성으로 말하고, 오디오를 변환하고, 캡처를 탐색하세요.",
         "toolsTitle": "사용 가능한 도구",
         "tools": {
           "speak": "음성 프로필로 텍스트 읽기.",
@@ -1133,7 +1116,7 @@
         "deleteCuda": "CUDA 백엔드 삭제 실패",
         "deleteRocm": "ROCm 백엔드 삭제 실패"
       },
-      "footer": "Voicebox는 시스템에서 사용 가능한 최고의 GPU를 자동으로 감지하여 사용합니다. Apple Silicon Mac에서는 Metal Performance Shaders(MPS)를 통해 MLX 백엔드가 Neural Engine과 GPU에서 기본 실행되며 추가 설정이 필요하지 않습니다. Windows에서는 선택적 CUDA(NVIDIA) 또는 ROCm(AMD) 백엔드를 다운로드하여 하드웨어 가속 추론을 사용할 수 있습니다. Intel XPU와 DirectML도 PyTorch를 통해 지원됩니다. GPU가 감지되지 않으면 Voicebox가 CPU로 대체됩니다 — 모든 엔진이 작동하지만 더 느립니다.",
+      "footer": "MagicVox는 시스템에서 사용 가능한 최고의 GPU를 자동으로 감지하여 사용합니다. Apple Silicon Mac에서는 Metal Performance Shaders(MPS)를 통해 MLX 백엔드가 Neural Engine과 GPU에서 기본 실행되며 추가 설정이 필요하지 않습니다. Windows에서는 선택적 CUDA(NVIDIA) 또는 ROCm(AMD) 백엔드를 다운로드하여 하드웨어 가속 추론을 사용할 수 있습니다. Intel XPU와 DirectML도 PyTorch를 통해 지원됩니다. GPU가 감지되지 않으면 MagicVox가 CPU로 대체됩니다 — 모든 엔진이 작동하지만 더 느립니다.",
       "rocm": {
         "title": "AMD ROCm 백엔드",
         "activeTitle": "ROCm 백엔드 활성",

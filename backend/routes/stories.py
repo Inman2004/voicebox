@@ -7,9 +7,10 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from .. import database, models
-from ..services import stories
 from ..app import safe_content_disposition
 from ..database import get_db
+from ..services import stories
+from ..services.audio_export import MEDIA_TYPES, AudioExportFormat, encode_audio
 
 router = APIRouter()
 
@@ -209,6 +210,7 @@ async def set_story_item_version(
 @router.get("/stories/{story_id}/export-audio")
 async def export_story_audio(
     story_id: str,
+    format: AudioExportFormat = "wav",
     db: Session = Depends(get_db),
 ):
     """Export story as single mixed audio file."""
@@ -224,11 +226,12 @@ async def export_story_audio(
         safe_name = "".join(c for c in story.name if c.isalnum() or c in (" ", "-", "_")).strip()
         if not safe_name:
             safe_name = "story"
-        filename = f"{safe_name}.wav"
+        filename = f"{safe_name}.{format}"
+        audio_bytes = await encode_audio(audio_bytes, format)
 
         return StreamingResponse(
             io.BytesIO(audio_bytes),
-            media_type="audio/wav",
+            media_type=MEDIA_TYPES[format],
             headers={"Content-Disposition": safe_content_disposition("attachment", filename)},
         )
     except HTTPException:

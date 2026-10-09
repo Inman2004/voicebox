@@ -5,10 +5,21 @@ import WaveSurfer from 'wavesurfer.js';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { apiClient } from '@/lib/api/client';
-import { formatAudioDuration } from '@/lib/utils/audio';
+import { formatAudioDuration, loadWaveformPeaks } from '@/lib/utils/audio';
 import { debug } from '@/lib/utils/debug';
 import { usePlatform } from '@/platform/PlatformContext';
 import { usePlayerStore } from '@/stores/playerStore';
+
+/** Backoff (ms) before each automatic retry of an audio load that failed at the network level. */
+const LOAD_RETRY_DELAYS_MS = [500, 1500, 3000];
+
+/** fetch() rejects with a TypeError when no HTTP response arrives (server unreachable, connection reset). */
+function isNetworkError(err: unknown): boolean {
+  return (
+    err instanceof TypeError ||
+    (err instanceof Error && /failed to fetch|network/i.test(err.message))
+  );
+}
 
 export function AudioPlayer() {
   const platform = usePlatform();
@@ -72,6 +83,8 @@ export function AudioPlayer() {
   const isUsingNativePlaybackRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by the Retry button so the same URL can be loaded again.
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [wsReady, setWsReady] = useState(false);
 
   // Create WaveSurfer once when the player becomes visible (audioUrl is set).
@@ -146,27 +159,16 @@ export function AudioPlayer() {
           setCurrentTime(time);
         });
 
+        // Waveform is drawn. Loading finishes (and autoplay starts) only once
+        // the WebAudio engine has decoded the file — see the load effect.
         wavesurfer.on('ready', () => {
           const dur = wavesurfer.getDuration();
           setDuration(dur);
-          loadingRef.current = false;
-          setIsLoading(false);
           setError(null);
           debug.log('Audio ready, duration:', dur);
 
           wavesurfer.setVolume(usePlayerStore.getState().volume);
           wavesurfer.setMuted(false);
-
-          // Auto-play if the flag is set (story mode advance or explicit play)
-          const shouldAutoPlayNow = usePlayerStore.getState().shouldAutoPlay;
-          if (shouldAutoPlayNow) {
-            usePlayerStore.getState().clearAutoPlayFlag();
-            wavesurfer.play().catch((err) => {
-              debug.error('Failed to autoplay:', err);
-            });
-          } else {
-            debug.log('Skipping auto-play - shouldAutoPlay is false');
-          }
         });
 
         wavesurfer.on('play', () => setIsPlaying(true));
@@ -257,6 +259,7 @@ export function AudioPlayer() {
   }, []);
 
   // Load audio when URL changes (reuses the existing WaveSurfer instance)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: loadAttempt re-runs the load when Retry is clicked
   useEffect(() => {
     const wavesurfer = wavesurferRef.current;
     if (!wavesurfer || !wsReady) return;
@@ -298,19 +301,60 @@ export function AudioPlayer() {
     setCurrentTime(0);
     setDuration(0);
 
-    wavesurfer
-      .load(audioUrl)
-      .then(() => {
-        debug.log('Audio loaded into WaveSurfer');
-        loadingRef.current = false;
-      })
-      .catch((err) => {
-        debug.error('Failed to load audio:', err);
-        loadingRef.current = false;
-        setIsLoading(false);
-        setError(`Failed to load audio: ${err instanceof Error ? err.message : String(err)}`);
-      });
-  }, [audioUrl, wsReady, setCurrentTime, setDuration]);
+    // A newer URL (or unmount) cancels the download and pending retries.
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const download = new AbortController();
+    const attemptLoad = (retry: number) => {
+      // The WebAudio engine fetches and decodes the URL itself and emits
+      // `canplay` when its buffer is ready; playing before that ends at once.
+      const media = wavesurfer.getMediaElement();
+      const playable = new Promise<void>((resolve) =>
+        media.addEventListener('canplay', () => resolve(), { once: true }),
+      );
+      // Precomputed peaks keep WaveSurfer off its Blob-based loader (see loadWaveformPeaks).
+      loadWaveformPeaks(audioUrl, download.signal)
+        .then(({ peaks, duration }) => wavesurfer.load(audioUrl, peaks, duration))
+        .then(() => playable)
+        .then(() => {
+          if (cancelled) return;
+          debug.log('Audio loaded into WaveSurfer');
+          loadingRef.current = false;
+          setIsLoading(false);
+          // Auto-play if the flag is set (story mode advance or explicit play)
+          if (usePlayerStore.getState().shouldAutoPlay) {
+            usePlayerStore.getState().clearAutoPlayFlag();
+            wavesurfer.play().catch((err) => debug.error('Failed to autoplay:', err));
+          }
+        })
+        .catch((err) => {
+          if (cancelled || download.signal.aborted) return;
+          // The server can be briefly unreachable (e.g. while it restarts);
+          // retry network failures before giving up.
+          if (isNetworkError(err) && retry < LOAD_RETRY_DELAYS_MS.length) {
+            debug.log(`Audio load failed (${String(err)}), retrying`, retry + 1);
+            retryTimer = setTimeout(() => {
+              if (!cancelled) attemptLoad(retry + 1);
+            }, LOAD_RETRY_DELAYS_MS[retry]);
+            return;
+          }
+          debug.error('Failed to load audio:', err);
+          loadingRef.current = false;
+          setIsLoading(false);
+          setError(
+            isNetworkError(err)
+              ? "Couldn't reach the MagicVox server to load this audio."
+              : `Failed to load audio: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+    };
+    attemptLoad(0);
+    return () => {
+      cancelled = true;
+      download.abort();
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [audioUrl, wsReady, loadAttempt, setCurrentTime, setDuration]);
 
   // Sync play/pause state (only when user clicks play/pause button, not auto-sync)
   // This effect is kept for external state changes but should be minimal
@@ -557,7 +601,18 @@ export function AudioPlayer() {
               aria-valuetext={`${formatAudioDuration(currentTime)} of ${formatAudioDuration(duration)}`}
             />
 
-            {error && <div className="text-xs text-destructive text-center py-2">{error}</div>}
+            {error && (
+              <div className="flex items-center justify-center gap-2 py-2 text-xs text-destructive">
+                <span>{error}</span>
+                <button
+                  type="button"
+                  onClick={() => setLoadAttempt((n) => n + 1)}
+                  className="rounded-full px-2 py-0.5 font-medium text-foreground underline-offset-2 hover:underline"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Time Display */}

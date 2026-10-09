@@ -102,5 +102,7 @@ export function useGenerationSettings() {
     settings: query.data,
     isLoading: query.isLoading,
     update: mutation.mutate,
+    updateAsync: mutation.mutateAsync,
+    isUpdating: mutation.isPending,
   };
 }

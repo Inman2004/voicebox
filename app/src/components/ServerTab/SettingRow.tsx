@@ -35,7 +35,7 @@ export function SettingRow({
   children,
 }: {
   title: string;
-  description?: string;
+  description?: ReactNode;
   htmlFor?: string;
   /** Right-aligned control (checkbox, button, badge, etc.) */
   action?: ReactNode;
@@ -52,7 +52,7 @@ export function SettingRow({
           >
             {title}
           </label>
-          {description && <p className="text-sm text-muted-foreground mt-0.5">{description}</p>}
+          {description && <div className="text-sm text-muted-foreground mt-0.5">{description}</div>}
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </div>

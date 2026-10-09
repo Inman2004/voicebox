@@ -10,8 +10,8 @@ from .. import config, models
 from ..backends import get_llm_model_configs, get_stt_model_configs
 from ..backends.base import is_model_cached
 from ..database import Capture as DBCapture, get_db
-from ..services import captures as captures_service
-from ..services import settings as settings_service
+from ..services import captures as captures_service, settings as settings_service
+from ..services.audio_export import MEDIA_TYPES, AudioExportFormat, encode_audio
 from ..services.refinement import RefinementFlags
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ async def get_capture_endpoint(capture_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/captures/{capture_id}/audio")
-async def get_capture_audio_endpoint(capture_id: str, db: Session = Depends(get_db)):
+async def get_capture_audio_endpoint(capture_id: str, format: AudioExportFormat | None = None, db: Session = Depends(get_db)):
     """Stream the original capture audio file."""
     row = db.query(DBCapture).filter(DBCapture.id == capture_id).first()
     if not row:
@@ -100,6 +100,17 @@ async def get_capture_audio_endpoint(capture_id: str, db: Session = Depends(get_
     audio_path = config.resolve_storage_path(row.audio_path)
     if audio_path is None or not audio_path.exists():
         raise HTTPException(status_code=404, detail="Audio file not found")
+
+    if format is not None:
+        from fastapi.responses import Response
+
+        from ..app import safe_content_disposition
+
+        return Response(
+            await encode_audio(audio_path, format),
+            media_type=MEDIA_TYPES[format],
+            headers={"Content-Disposition": safe_content_disposition("attachment", f"capture_{capture_id}.{format}")},
+        )
 
     return FileResponse(
         audio_path,

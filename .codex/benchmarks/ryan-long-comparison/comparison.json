@@ -1,0 +1,9 @@
+{
+  "characters": 2410,
+  "same_sample_rate": true,
+  "standard_samples": 3895920,
+  "fast_samples": 3895920,
+  "exact_waveform_match": true,
+  "max_abs_difference": 0.0,
+  "speedup": 2.5614958291669834
+}

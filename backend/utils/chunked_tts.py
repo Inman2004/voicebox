@@ -113,7 +113,14 @@ def _find_last_sentence_end(text: str) -> int:
     and periods inside bracket tags (``[laugh]``).  Also handles CJK
     sentence-ending punctuation (``。！？``).
     """
-    best = -1
+    ends = find_sentence_ends(text)
+    return ends[-1] if ends else -1
+
+
+def find_sentence_ends(text: str) -> List[int]:
+    """Return the indices of every real sentence-ending punctuation mark,
+    in ascending order, using the same rules as the chunk splitter."""
+    ends: List[int] = []
     # ASCII sentence ends
     for m in re.finditer(r"[.!?](?:\s|$)", text):
         pos = m.start()
@@ -133,12 +140,11 @@ def _find_last_sentence_end(text: str) -> int:
         # Skip if we're inside a bracket tag
         if _inside_bracket_tag(text, pos):
             continue
-        best = pos
+        ends.append(pos)
     # CJK sentence-ending punctuation
     for m in re.finditer(r"[\u3002\uff01\uff1f]", text):
-        if m.start() > best:
-            best = m.start()
-    return best
+        ends.append(m.start())
+    return sorted(ends)
 
 
 def _find_last_clause_boundary(text: str) -> int:
@@ -214,6 +220,7 @@ async def generate_chunked(
     crossfade_ms: int = 50,
     trim_fn=None,
     runaway_detector=None,
+    speed: float | None = None,
 ) -> Tuple[np.ndarray, int]:
     """Generate audio with automatic chunking for long text.
 
@@ -245,6 +252,9 @@ async def generate_chunked(
     runaway_detector : callable | None
         Optional ``(audio, sample_rate) -> bool`` detector. When it flags
         unstable output, the affected text is split in half and retried.
+    speed : float | None
+        Forwarded as ``speed=`` to backends with a native rate control.
+        Leave None for engines without one (the caller time-stretches).
 
     Returns
     -------
@@ -255,12 +265,14 @@ async def generate_chunked(
         chunk_seed: int | None,
         retry_depth: int = 0,
     ) -> tuple[np.ndarray, int]:
+        extra = {"speed": speed} if speed is not None else {}
         chunk_audio, chunk_sr = await backend.generate(
             chunk_text,
             voice_prompt,
             language,
             chunk_seed,
             instruct,
+            **extra,
         )
 
         if runaway_detector is not None and runaway_detector(chunk_audio, chunk_sr):

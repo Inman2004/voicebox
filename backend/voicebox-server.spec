@@ -61,6 +61,11 @@ tmp_ret = collect_all('mlx_lm')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
+export_data, export_binaries, export_imports = collect_all('imageio_ffmpeg')
+datas += export_data
+binaries += export_binaries
+hiddenimports += export_imports
+
 a = Analysis(
     ['server.py'],
     pathex=[],

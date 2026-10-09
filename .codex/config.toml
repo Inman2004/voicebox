@@ -1,0 +1,5 @@
+[mcp_servers.voicebox]
+url = "http://127.0.0.1:17493/mcp"
+
+[mcp_servers.voicebox.http_headers]
+X-Voicebox-Client-Id = "claude-code"

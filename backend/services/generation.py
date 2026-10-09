@@ -17,15 +17,29 @@ Mode differences:
 from __future__ import annotations
 
 import asyncio
+import time
 import traceback
+from datetime import datetime
 from typing import Literal, Optional
 
 from .. import config
 from . import history, profiles
 from ..database import get_db
 from ..utils.tasks import get_task_manager
+from . import inference_runtime as runtime
 
 
+class _OptionsRequest:
+    """Adapter so internal callers can reuse ``resolve_generation_options``."""
+
+    def __init__(self, speed, preprocessing, postprocessing, normalize: bool = True):
+        self.speed = speed
+        self.preprocessing = preprocessing
+        self.postprocessing = postprocessing
+        self.normalize = normalize
+
+
+@runtime.qwen_job
 async def run_generation(
     *,
     generation_id: str,
@@ -42,20 +56,18 @@ async def run_generation(
     max_chunk_chars: Optional[int] = None,
     crossfade_ms: Optional[int] = None,
     version_id: Optional[str] = None,
+    speed: Optional[float] = None,
+    preprocessing=None,
+    postprocessing=None,
 ) -> None:
     """Execute TTS inference and persist the result.
 
     This is the single entry point for all background generation work.
     It is designed to be enqueued via ``services.task_queue.enqueue_generation``.
     """
-    from ..backends import (
-        engine_needs_trim,
-        engine_retries_runaway,
-        get_tts_backend_for_engine,
-        load_engine_model,
-    )
-    from ..utils.chunked_tts import generate_chunked
-    from ..utils.audio import has_tts_runaway, normalize_audio, save_audio, trim_tts_output
+    from ..backends import get_tts_backend_for_engine, load_engine_model
+    from ..utils.audio import save_audio
+    from .render import render_speech
 
     task_manager = get_task_manager()
     bg_db = next(get_db())
@@ -63,10 +75,18 @@ async def run_generation(
     try:
         tts_model = get_tts_backend_for_engine(engine)
 
+        # Timing metadata — started_at lets the UI show a live elapsed timer.
+        started_at = datetime.utcnow()
+        t_start = time.perf_counter()
+        load_seconds = 0.0
         if not tts_model.is_loaded():
-            await history.update_generation_status(generation_id, "loading_model", bg_db)
-
-        await load_engine_model(engine, model_size)
+            await history.update_generation_status(
+                generation_id, "loading_model", bg_db, started_at=started_at
+            )
+            await load_engine_model(engine, model_size)
+            load_seconds = time.perf_counter() - t_start
+        else:
+            await load_engine_model(engine, model_size)
 
         voice_prompt = await profiles.create_voice_prompt_for_profile(
             profile_id,
@@ -75,29 +95,38 @@ async def run_generation(
             engine=engine,
         )
 
-        await history.update_generation_status(generation_id, "generating", bg_db)
-        trim_fn = trim_tts_output if engine_needs_trim(engine) else None
-        runaway_detector = has_tts_runaway if engine_retries_runaway(engine) else None
+        await history.update_generation_status(
+            generation_id, "generating", bg_db, started_at=started_at, load_seconds=load_seconds
+        )
+        t_synth = time.perf_counter()
 
-        gen_kwargs: dict = dict(
+        # Retry/regenerate don't carry the original rail options, so they
+        # fall back to the saved defaults.
+        if speed is None or preprocessing is None or postprocessing is None:
+            from .settings import resolve_generation_options
+
+            _defaults = _OptionsRequest(speed, preprocessing, postprocessing, normalize or mode == "regenerate")
+            speed, preprocessing, postprocessing = resolve_generation_options(_defaults, bg_db)
+
+        audio, sample_rate = await render_speech(
+            tts_model,
+            engine=engine,
+            text=text,
+            voice_prompt=voice_prompt,
             language=language,
             seed=seed if mode != "regenerate" else None,
             instruct=instruct,
-            trim_fn=trim_fn,
-            runaway_detector=runaway_detector,
+            max_chunk_chars=max_chunk_chars,
+            crossfade_ms=crossfade_ms,
+            speed=speed,
+            preprocessing=preprocessing,
+            postprocessing=postprocessing,
         )
-        if max_chunk_chars is not None:
-            gen_kwargs["max_chunk_chars"] = max_chunk_chars
-        if crossfade_ms is not None:
-            gen_kwargs["crossfade_ms"] = crossfade_ms
-
-        audio, sample_rate = await generate_chunked(tts_model, text, voice_prompt, **gen_kwargs)
-
-        # --- Normalize (generate and regenerate always; retry skips) -----
-        if normalize or mode == "regenerate":
-            audio = normalize_audio(audio)
 
         duration = len(audio) / sample_rate
+        generation_seconds = time.perf_counter() - t_synth
+        if engine == "qwen_custom_voice":
+            runtime.publish(stage="saving", generation_seconds=generation_seconds, audio_seconds=duration)
 
         # --- Persist audio and update status -----------------------------
         if mode == "generate":
@@ -132,6 +161,8 @@ async def run_generation(
             db=bg_db,
             audio_path=final_path,
             duration=duration,
+            completed_at=datetime.utcnow(),
+            generation_seconds=generation_seconds,
         )
 
     except asyncio.CancelledError:
@@ -154,6 +185,14 @@ async def run_generation(
     else:
         _notify_speak_end(generation_id, status="completed")
     finally:
+        if engine == "qwen_custom_voice":
+            from ..database import Generation
+
+            row = bg_db.query(Generation).filter_by(id=generation_id).first()
+            if row:
+                runtime.publish(stage="completed" if row.status == "completed" else "failed", active=False)
+                row.diagnostics = runtime.snapshot(generation_id)
+                bg_db.commit()
         task_manager.complete_generation(generation_id)
         bg_db.close()
 
@@ -249,6 +288,7 @@ def _save_retry(
     return config.to_storage_path(audio_path)
 
 
+@runtime.qwen_job
 async def generate_audio_sync(
     *,
     profile_id: str,
@@ -261,6 +301,9 @@ async def generate_audio_sync(
     normalize: bool = True,
     max_chunk_chars: Optional[int] = None,
     crossfade_ms: Optional[int] = None,
+    speed: Optional[float] = None,
+    preprocessing=None,
+    postprocessing=None,
 ) -> bytes:
     """Run a TTS generation synchronously and return the resulting wav bytes.
 
@@ -274,15 +317,10 @@ async def generate_audio_sync(
     normalize, then encodes in-memory via :func:`tts.audio_to_wav_bytes`
     (same helper ``/generate/stream`` uses).
     """
-    from ..backends import (
-        engine_needs_trim,
-        engine_retries_runaway,
-        get_tts_backend_for_engine,
-        load_engine_model,
-    )
-    from ..utils.chunked_tts import generate_chunked
-    from ..utils.audio import has_tts_runaway, normalize_audio, trim_tts_output
+    from ..backends import get_tts_backend_for_engine, load_engine_model
     from . import tts
+    from .render import render_speech
+    from .settings import resolve_generation_options
 
     bg_db = next(get_db())
     try:
@@ -295,30 +333,26 @@ async def generate_audio_sync(
             use_cache=True,
             engine=engine,
         )
+        speed, preprocessing, postprocessing = resolve_generation_options(
+            _OptionsRequest(speed, preprocessing, postprocessing, normalize), bg_db
+        )
     finally:
         bg_db.close()
 
-    trim_fn = trim_tts_output if engine_needs_trim(engine) else None
-    runaway_detector = has_tts_runaway if engine_retries_runaway(engine) else None
-
-    gen_kwargs: dict = dict(
+    audio, sample_rate = await render_speech(
+        tts_model,
+        engine=engine,
+        text=text,
+        voice_prompt=voice_prompt,
         language=language,
         seed=seed,
         instruct=instruct,
-        trim_fn=trim_fn,
-        runaway_detector=runaway_detector,
+        max_chunk_chars=max_chunk_chars,
+        crossfade_ms=crossfade_ms,
+        speed=speed,
+        preprocessing=preprocessing,
+        postprocessing=postprocessing,
     )
-    if max_chunk_chars is not None:
-        gen_kwargs["max_chunk_chars"] = max_chunk_chars
-    if crossfade_ms is not None:
-        gen_kwargs["crossfade_ms"] = crossfade_ms
-
-    audio, sample_rate = await generate_chunked(
-        tts_model, text, voice_prompt, **gen_kwargs
-    )
-
-    if normalize:
-        audio = normalize_audio(audio)
 
     return tts.audio_to_wav_bytes(audio, sample_rate)
 

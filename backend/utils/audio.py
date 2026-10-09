@@ -110,6 +110,153 @@ def save_audio(
         raise OSError(f"Failed to save audio to {path}: {e}") from e
 
 
+def apply_speed(audio: np.ndarray, sample_rate: int, speed: float) -> np.ndarray:
+    """Change speech rate without changing pitch.
+
+    Used for engines that have no native speed control.
+    """
+    if speed is None or abs(speed - 1.0) < 1e-3 or len(audio) == 0:
+        return audio
+    audio = np.asarray(audio, dtype=np.float32)
+    try:
+        from pedalboard import time_stretch
+
+        stretched = time_stretch(audio.reshape(1, -1), float(sample_rate), stretch_factor=float(speed))
+        return np.asarray(stretched[0], dtype=np.float32)
+    except Exception:
+        return librosa.effects.time_stretch(audio, rate=float(speed)).astype(np.float32)
+
+
+def remove_silence(
+    audio: np.ndarray,
+    sample_rate: int,
+    max_gap_ms: int = 300,
+    top_db: float = 40.0,
+    pad_ms: int = 30,
+) -> np.ndarray:
+    """Trim leading/trailing silence and shorten long internal gaps.
+
+    Gaps quieter than *top_db* below peak and longer than *max_gap_ms* are
+    shortened to *max_gap_ms*. Callers apply this per speech segment, so
+    explicit pause-tag silence is never touched.
+    """
+    audio = np.asarray(audio, dtype=np.float32)
+    if len(audio) == 0 or not np.any(audio):
+        return audio
+
+    intervals = librosa.effects.split(audio, top_db=top_db, frame_length=1024, hop_length=256)
+    if len(intervals) == 0:
+        return audio
+
+    pad = int(sample_rate * pad_ms / 1000)
+    max_gap = int(sample_rate * max_gap_ms / 1000)
+    n = len(audio)
+
+    pieces = []
+    prev_end = None
+    for start, end in intervals:
+        start = max(0, start - pad)
+        end = min(n, end + pad)
+        if prev_end is not None:
+            if start <= prev_end:
+                # Padded intervals overlap — keep the original audio between them
+                pieces.append(audio[prev_end:end])
+                prev_end = end
+                continue
+            gap = start - prev_end
+            if gap > max_gap:
+                pieces.append(np.zeros(max_gap, dtype=np.float32))
+            else:
+                pieces.append(audio[prev_end:start])
+        pieces.append(audio[start:end])
+        prev_end = end
+
+    return np.concatenate(pieces).astype(np.float32)
+
+
+def normalize_loudness_broadcast(
+    audio: np.ndarray,
+    sample_rate: int,
+    target_lufs: float = -16.0,
+    ceiling_db: float = -1.0,
+) -> np.ndarray:
+    """EBU R128 / ITU-R BS.1770 integrated loudness normalization with a
+    peak limiter at *ceiling_db*.
+
+    Falls back to :func:`normalize_audio` for clips shorter than the 400 ms
+    gating block pyloudnorm needs.
+    """
+    audio = np.asarray(audio, dtype=np.float32)
+    if len(audio) < int(sample_rate * 0.4) or not np.any(audio):
+        return normalize_audio(audio)
+
+    try:
+        import pyloudnorm as pyln
+
+        meter = pyln.Meter(sample_rate)
+        loudness = meter.integrated_loudness(audio.astype(np.float64))
+    except Exception:
+        return normalize_audio(audio)
+
+    if not np.isfinite(loudness):
+        return audio
+
+    ceiling = 10 ** (ceiling_db / 20)
+    source = audio
+    gain_db = target_lufs - loudness
+    # Limiting peaks lowers integrated loudness, so re-measure and top up
+    # (the usual two-pass approach). Converges in 1–3 passes for speech.
+    for _ in range(3):
+        audio = (source * 10 ** (gain_db / 20)).astype(np.float32)
+        if np.max(np.abs(audio)) <= ceiling:
+            break
+        audio = peak_limit(audio, sample_rate, ceiling)
+        measured = meter.integrated_loudness(audio.astype(np.float64))
+        if not np.isfinite(measured) or abs(measured - target_lufs) <= 0.3:
+            break
+        gain_db += target_lufs - measured
+
+    return audio
+
+
+def peak_limit(audio: np.ndarray, sample_rate: int, ceiling: float, window_ms: float = 8.0) -> np.ndarray:
+    """Transparent look-ahead peak limiter (no make-up gain).
+
+    The per-sample gain needed to stay under *ceiling* is spread over
+    neighbouring samples with a min-filter, then smoothed with a narrower
+    moving average. Every averaged value is itself a minimum over a window
+    containing the sample, so the smoothed gain never exceeds what that
+    sample needs — no overshoot, no clicks from hard gain steps.
+
+    pedalboard's Limiter is not used because it applies make-up gain,
+    which would undo the loudness target.
+    """
+    from scipy.ndimage import minimum_filter1d, uniform_filter1d
+
+    audio = np.asarray(audio, dtype=np.float32)
+    needed = np.minimum(1.0, ceiling / np.maximum(np.abs(audio), 1e-9)).astype(np.float32)
+    radius = max(1, int(sample_rate * window_ms / 1000))
+    gain = minimum_filter1d(needed, size=2 * radius + 1, mode="nearest")
+    gain = uniform_filter1d(gain, size=radius, mode="nearest")
+    return np.clip(audio * gain, -ceiling, ceiling).astype(np.float32)
+
+
+def apply_postprocessing(audio: np.ndarray, sample_rate: int, options) -> np.ndarray:
+    """Apply loudness normalization per ``PostprocessingOptions``.
+
+    Silence removal is applied earlier, per speech segment (see
+    ``services.render``), so explicit pauses survive.
+    """
+    if options is None:
+        return audio
+    mode = getattr(options, "loudness", "off")
+    if mode == "broadcast":
+        return normalize_loudness_broadcast(audio, sample_rate, getattr(options, "target_lufs", -16.0))
+    if mode == "simple":
+        return normalize_audio(audio)
+    return audio
+
+
 def has_tts_runaway(
     audio: np.ndarray,
     sample_rate: int = 24000,

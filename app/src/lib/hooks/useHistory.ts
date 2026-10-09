@@ -1,3 +1,4 @@
+import { chooseAudioExportFormat } from '@/stores/audioExportStore';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 import type { HistoryQuery } from '@/lib/api/types';
@@ -73,7 +74,9 @@ export function useExportGenerationAudio() {
 
   return useMutation({
     mutationFn: async ({ generationId, text }: { generationId: string; text: string }) => {
-      const blob = await apiClient.exportGenerationAudio(generationId);
+      const format = await chooseAudioExportFormat();
+      if (!format) return null;
+      const blob = await apiClient.exportGenerationAudio(generationId, format);
 
       // Create safe filename from text. Append a short id so exports of
       // similarly-worded generations don't collide on the same filename
@@ -82,12 +85,12 @@ export function useExportGenerationAudio() {
         .substring(0, 30)
         .replace(/[^a-z0-9]/gi, '-')
         .toLowerCase();
-      const filename = `${safeText}-${generationId.substring(0, 8)}.wav`;
+      const filename = `${safeText}-${generationId.substring(0, 8)}.${format}`;
 
       await platform.filesystem.saveFile(filename, blob, [
         {
           name: 'Audio File',
-          extensions: ['wav'],
+          extensions: [format],
         },
       ]);
 

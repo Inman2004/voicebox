@@ -1,4 +1,15 @@
 {
+  "audioExport": {
+    "title": "Premium Export Formats",
+    "description": "Export MP3 and M4A alongside WAV for direct sharing and delivery.",
+    "format": "Audio format",
+    "wavHint": "Original quality",
+    "wavDetail": "Uncompressed",
+    "mp3Hint": "Easy sharing",
+    "m4aHint": "Compact delivery",
+    "cancel": "Cancel",
+    "export": "Export {{format}}"
+},
   "common": {
     "cancel": "Cancel",
     "save": "Save",
@@ -20,7 +31,11 @@
     "audio": "Audio",
     "models": "Models",
     "settings": "Settings",
-    "updateBadge": "Update"
+    "updateBadge": "Update",
+    "manageModels": "Manage Models",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar",
+    "gallery": "Gallery"
   },
   "captures": {
     "title": "Captures",
@@ -135,13 +150,13 @@
       },
       "inputMonitoring": {
         "label": "Input Monitoring permission",
-        "ready": "macOS allows Voicebox to detect your global shortcut.",
-        "missing": "macOS needs to allow Voicebox to detect the global shortcut.",
+        "ready": "macOS allows MagicVox to detect your global shortcut.",
+        "missing": "macOS needs to allow MagicVox to detect the global shortcut.",
         "openSettings": "Open Settings"
       },
       "accessibility": {
         "label": "Accessibility permission",
-        "ready": "Voicebox can paste transcriptions into other apps.",
+        "ready": "MagicVox can paste transcriptions into other apps.",
         "missing": "Required so transcriptions can paste into the focused app.",
         "openSettings": "Open Settings"
       }
@@ -149,19 +164,19 @@
     "permissions": {
       "accessibility": {
         "title": "Grant Accessibility permission to enable auto-paste",
-        "body": "Voicebox needs <path>System Settings → Privacy & Security → Accessibility</path> to paste transcriptions into other apps. Your dictation still lands in the Captures tab without it.",
+        "body": "MagicVox needs <path>System Settings → Privacy & Security → Accessibility</path> to paste transcriptions into other apps. Your dictation still lands in the Captures tab without it.",
         "openSettings": "Open Settings",
         "recheck": "I've enabled it",
         "rechecking": "Checking…",
-        "stillMissing": "Still not detected. macOS usually requires quitting and reopening Voicebox after toggling the permission."
+        "stillMissing": "Still not detected. macOS usually requires quitting and reopening MagicVox after toggling the permission."
       },
       "inputMonitoring": {
         "title": "Grant Input Monitoring to enable the global shortcut",
-        "body": "Voicebox needs <path>System Settings → Privacy & Security → Input Monitoring</path> to detect your dictation chord. The toggle is on, but macOS is blocking key events until you allow it.",
+        "body": "MagicVox needs <path>System Settings → Privacy & Security → Input Monitoring</path> to detect your dictation chord. The toggle is on, but macOS is blocking key events until you allow it.",
         "openSettings": "Open Settings",
         "recheck": "I've enabled it",
         "rechecking": "Checking…",
-        "stillMissing": "Still not detected. macOS usually requires quitting and reopening Voicebox after toggling the permission."
+        "stillMissing": "Still not detected. macOS usually requires quitting and reopening MagicVox after toggling the permission."
       }
     }
   },
@@ -390,28 +405,6 @@
       "updatedDescription": "Reference text has been updated successfully.",
       "updateFailed": "Update failed",
       "updateFailedFallback": "Failed to update sample"
-    }
-  },
-  "profiles": {
-    "card": {
-      "noDescription": "No description",
-      "designed": "designed",
-      "export": "Export profile",
-      "edit": "Edit profile",
-      "delete": "Delete profile",
-      "selectLabel": "{{name}}, {{language}}. Select as voice for generation.",
-      "selectLabelSelected": "{{name}}, {{language}}. Selected as voice for generation."
-    },
-    "list": {
-      "errorLoading": "Error loading profiles: {{message}}",
-      "empty": "No voice profiles yet. Create your first profile to get started.",
-      "createVoice": "Create Voice",
-      "unsupportedNote": "Only supported voice profiles can be selected for the current model."
-    },
-    "deleteDialog": {
-      "title": "Delete Profile",
-      "body": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
-      "deleting": "Deleting…"
     }
   },
   "effects": {
@@ -748,7 +741,7 @@
     },
     "language": {
       "label": "Language",
-      "description": "Choose the display language for Voicebox."
+      "description": "Choose the display language for MagicVox."
     },
     "theme": {
       "label": "Theme",
@@ -757,6 +750,16 @@
         "system": "System",
         "light": "Light",
         "dark": "Dark"
+      }
+    },
+    "accent": {
+      "label": "Accent colour",
+      "description": "The highlight colour used across MagicVox.",
+      "options": {
+        "magenta": "Magenta",
+        "violet": "Violet",
+        "purple": "Purple",
+        "gold": "Classic gold"
       }
     },
     "general": {
@@ -769,7 +772,7 @@
       },
       "serverUrl": {
         "title": "Server URL",
-        "description": "The address of your voicebox backend server.",
+        "description": "The address of your MagicVox backend server.",
         "invalidUrl": "Please enter a valid URL",
         "updatedTitle": "Server URL updated",
         "updatedDescription": "Connected to {{url}}"
@@ -824,7 +827,7 @@
       },
       "api": {
         "title": "API Access",
-        "description": "Integrate Voicebox into your workflow via the REST API at <code>{{url}}</code>",
+        "description": "Integrate MagicVox into your workflow via the REST API at <code>{{url}}</code>",
         "viewReference": "View the full API reference",
         "endpoints": {
           "generate": "Generate speech",
@@ -857,9 +860,18 @@
         "description": "Automatically play audio when a generation completes."
       },
       "folder": {
-        "title": "Generations folder",
+        "title": "Output folder",
         "description": "Where generated audio files are stored on disk.",
-        "open": "Open"
+        "open": "Open",
+        "change": "Change…",
+        "useDefault": "Use default",
+        "pickTitle": "Choose where to save generated audio",
+        "defaultHint": "New audio is saved in the app's data folder.",
+        "customHint": "New audio is saved here. Earlier outputs stay where they are and still play.",
+        "changed": "Output folder changed",
+        "resetDone": "Output folder reset to default",
+        "existingStay": "New generations go to the new folder; existing ones stay where they were saved.",
+        "changeFailed": "Couldn't use that folder"
       },
       "sidebar": {
         "aboutTitle": "About voice generation",
@@ -913,7 +925,7 @@
         },
         "autoPaste": {
           "title": "Auto-paste into focused text field",
-          "description": "If a text input is focused in another app, paste directly into it. Voicebox saves and restores whatever was on your clipboard."
+          "description": "If a text input is focused in another app, paste directly into it. MagicVox saves and restores whatever was on your clipboard."
         }
       },
       "transcription": {
@@ -921,7 +933,7 @@
         "description": "Pick which speech-to-text model runs on your captures.",
         "model": {
           "title": "Transcription model",
-          "description": "Whisper ships with Voicebox and runs entirely on your machine.",
+          "description": "Whisper ships with MagicVox and runs entirely on your machine.",
           "base": "Whisper Base · 74M · {{tail}}",
           "small": "Whisper Small · 244M · {{tail}}",
           "medium": "Whisper Medium · 769M · {{tail}}",
@@ -997,7 +1009,7 @@
       },
       "storage": {
         "title": "Storage",
-        "description": "Captures are saved as paired audio and transcript files in your Voicebox data directory.",
+        "description": "Captures are saved as paired audio and transcript files in your MagicVox data directory.",
         "retention": {
           "title": "Retention",
           "description": "How long to keep captures. Applies to both audio and transcripts.",
@@ -1014,7 +1026,7 @@
       },
       "sidebar": {
         "aboutTitle": "About Captures",
-        "aboutBody": "Hold a shortcut anywhere on your machine, speak, and Voicebox turns your voice into text. Replay it in any cloned voice, paste it into any app, or pipe it into your coding agent.",
+        "aboutBody": "Hold a shortcut anywhere on your machine, speak, and MagicVox turns your voice into text. Replay it in any cloned voice, paste it into any app, or pipe it into your coding agent.",
         "differencesTitle": "What's different",
         "local": {
           "title": "Fully local.",
@@ -1030,14 +1042,14 @@
         },
         "windowsCaveat": {
           "title": "Heads-up on Windows",
-          "body": "The shortcut won't fire while Voicebox itself or any app running as administrator is focused. Working on it."
+          "body": "The shortcut won't fire while MagicVox itself or any app running as administrator is focused. Working on it."
         }
       }
     },
     "mcp": {
       "install": {
         "title": "Install into your agent",
-        "description": "Voicebox exposes a local MCP server whenever the app is open. Paste one of these snippets into your agent's MCP config.",
+        "description": "MagicVox exposes a local MCP server whenever the app is open. Paste one of these snippets into your agent's MCP config.",
         "http": {
           "title": "HTTP (recommended)",
           "description": "For clients that speak HTTP MCP — Claude Code, Cursor, Windsurf, VS Code."
@@ -1078,7 +1090,7 @@
       },
       "sidebar": {
         "aboutTitle": "About MCP",
-        "aboutBody": "Model Context Protocol lets your AI coding agent — Claude Code, Cursor, Windsurf — call Voicebox tools. Speak in a cloned voice, transcribe audio, browse captures.",
+        "aboutBody": "Model Context Protocol lets your AI coding agent — Claude Code, Cursor, Windsurf — call MagicVox tools. Speak in a cloned voice, transcribe audio, browse captures.",
         "toolsTitle": "Available tools",
         "tools": {
           "speak": "Speak text in a voice profile.",
@@ -1124,7 +1136,8 @@
         "title": "Switch to CPU backend",
         "description": "Disable GPU acceleration. You can re-download the GPU backend later.",
         "button": "Switch"
-      },      "remove": {
+      },
+      "remove": {
         "title": "Remove CUDA backend",
         "description": "Delete the downloaded CUDA binary to free disk space.",
         "button": "Remove"
@@ -1137,7 +1150,7 @@
         "deleteCuda": "Failed to delete CUDA backend",
         "deleteRocm": "Failed to delete ROCm backend"
       },
-      "footer": "Voicebox automatically detects and uses the best available GPU on your system. On Apple Silicon Macs, the MLX backend runs natively on the Neural Engine and GPU via Metal Performance Shaders (MPS), with no additional setup required. On Windows, you can download optional CUDA (NVIDIA) or ROCm (AMD) backends for hardware-accelerated inference. Intel XPU and DirectML are also supported where available through PyTorch. When no GPU is detected, Voicebox falls back to CPU — all engines still work, just slower.",
+      "footer": "MagicVox automatically detects and uses the best available GPU on your system. On Apple Silicon Macs, the MLX backend runs natively on the Neural Engine and GPU via Metal Performance Shaders (MPS), with no additional setup required. On Windows, you can download optional CUDA (NVIDIA) or ROCm (AMD) backends for hardware-accelerated inference. Intel XPU and DirectML are also supported where available through PyTorch. When no GPU is detected, MagicVox falls back to CPU — all engines still work, just slower.",
       "rocm": {
         "title": "AMD ROCm Backend",
         "activeTitle": "ROCm Backend Active",
@@ -1268,6 +1281,245 @@
       "migrationFailed": "Migration failed",
       "migrationFailedGeneric": "Failed to migrate models",
       "migrationConnectionLost": "Lost connection during migration"
+    }
+  },
+  "sidebar": {
+    "resources": {
+      "title": "Resources",
+      "appRam": "App RAM",
+      "model": "Model",
+      "noModel": "No model loaded",
+      "unavailable": "Resource stats unavailable"
+    }
+  },
+  "generate": {
+    "title": "AI Speech",
+    "history": "History",
+    "settings": "Generation settings",
+    "showSettings": "Show settings",
+    "hideSettings": "Hide settings",
+    "reset": "Reset",
+    "editor": {
+      "placeholder": "Type your text here for {{name}}…",
+      "insertPause": "Insert a pause anywhere:",
+      "pauseHint": "Any duration in seconds or milliseconds is supported, e.g. <750ms> or <1.5s>.",
+      "inputText": "Input Text",
+      "characters": "{{formatted}} / {{max}} characters",
+      "shortcut": "Ctrl/⌘ + Enter",
+      "voiceFailed": "Couldn't prepare this voice"
+    },
+    "result": {
+      "empty": "Click Generate to start the AI generation process.",
+      "emptyHint": "Timing, audio length and speed for each run will show up here.",
+      "queued": "Queued…",
+      "loadingModel": "Loading model…",
+      "generating": "Generating…",
+      "failed": "Generation failed",
+      "done": "Generated in {{time}}",
+      "play": "Play",
+      "generationTime": "Generation time",
+      "audioLength": "Audio length",
+      "speed": "Throughput",
+      "speedHint": "Seconds of audio produced per second of processing.",
+      "realtime": "{{factor}}× realtime",
+      "modelLoad": "Model load",
+      "warm": "Already loaded",
+      "inProgress": "In progress…",
+      "elapsed": "Elapsed",
+      "engine": "Engine",
+      "characters": "Characters",
+      "breakdown": "Total {{total}} · queued {{queued}} · model load {{load}} · synthesis {{synth}}"
+    },
+    "model": {
+      "title": "Model",
+      "manage": "Manage",
+      "change": "Change",
+      "choose": "Choose a model",
+      "helpMeSelect": "Help me select",
+      "selected": "Selected",
+      "pin": "Pin to top",
+      "unpin": "Unpin",
+      "download": "Download ({{size}})",
+      "downloadShort": "Download",
+      "downloading": "Downloading…",
+      "notDownloaded": "Not downloaded · {{size}}",
+      "size": "Model size",
+      "outputLanguage": "Output Language",
+      "help": {
+        "cloneQuestion": "Which voices do you want?",
+        "builtIn": "Ready-made voices",
+        "cloneMine": "Clone my own",
+        "languageQuestion": "Main language",
+        "priorityQuestion": "What matters most?",
+        "speed": "Speed",
+        "balanced": "Balanced",
+        "quality": "Quality",
+        "use": "Use",
+        "none": "No model matches — try another language."
+      }
+    },
+    "voice": {
+      "title": "Voice",
+      "browseAll": "Browse All",
+      "more": "+ {{count}} more",
+      "libraryTitle": "Voice Library",
+      "available": "{{count}} voices available for {{engine}}",
+      "createVoice": "Create voice",
+      "search": "Search…",
+      "allLanguages": "All languages",
+      "all": "All",
+      "allTags": "All tags",
+      "genderFilter": "Gender",
+      "favoritesOnly": "Favorites only",
+      "noMatches": "No voices match these filters.",
+      "empty": "No voices for this model yet.",
+      "emptyCloning": "{{engine}} speaks with voices you clone. Create one from a short recording.",
+      "favorite": "Add to favorites",
+      "unfavorite": "Remove from favorites",
+      "playSample": "Play sample",
+      "stopSample": "Stop sample",
+      "noPreview": "No sample available — add a reference recording to this voice.",
+      "gender": {
+        "male": "Male",
+        "female": "Female"
+      },
+      "age": {
+        "young": "Young",
+        "middle_aged": "Middle aged",
+        "senior": "Senior"
+      },
+      "type": {
+        "cloned": "Cloned",
+        "designed": "Designed",
+        "preset": "Built-in"
+      }
+    },
+    "params": {
+      "title": "Parameters",
+      "presets": "Presets",
+      "presetsHint": "Apply a saved setup",
+      "saveCurrent": "Save current as preset…",
+      "presetName": "Preset name",
+      "presetSaved": "Saved preset “{{name}}”",
+      "presetSaveFailed": "Couldn't save preset",
+      "deletePreset": "Delete {{name}}",
+      "speedStretchNote": "{{engine}} has no native speed control, so speed is applied after synthesis with pitch-preserving time-stretching."
+    },
+    "post": {
+      "title": "Post-Processing",
+      "removeSilence": "Remove Silence",
+      "removeSilenceHelp": "Trims silence at the start and end, and shortens long gaps between phrases. Pause tags are never shortened.",
+      "normalize": "Normalize Loudness",
+      "normalizeHelp": "Brings every generation to a consistent volume.",
+      "method": "Normalization Method",
+      "methodHelp": "Broadcast measures perceived loudness (EBU R128 / LUFS) and limits peaks at −1 dBTP. Simple scales to a fixed RMS level.",
+      "broadcast": "Broadcast",
+      "simple": "Simple",
+      "targetLevel": "Target Level",
+      "targetLevelHelp": "−16 LUFS suits podcasts and web audio; −23/−24 LUFS is the broadcast TV standard.",
+      "effects": "Effects",
+      "effectsHelp": "Applied after loudness. The un-processed take is kept as the original version."
+    },
+    "pre": {
+      "title": "Text Preprocessing",
+      "normalizeWhitespace": "Normalize Whitespace",
+      "normalizeWhitespaceHelp": "Collapses repeated spaces and blank lines so the engine doesn't insert odd pauses.",
+      "smartNumbers": "Smart Numbers & Dates",
+      "smartNumbersHelp": "Spells out numbers, currency, percentages, ordinals, dates and times (e.g. $1,250 → one thousand two hundred fifty dollars).",
+      "lowercase": "Convert to Lowercase",
+      "lowercaseHelp": "Stops some engines from spelling out ALL-CAPS words letter by letter.",
+      "fixInitials": "Fix Dot-Letter Initials",
+      "fixInitialsHelp": "Reads J.R.R. or U.S.A. as letters instead of pausing at every dot.",
+      "removeReferences": "Remove Reference Numbers",
+      "removeReferencesHelp": "Drops citation markers like [1] or [2, 3]. Tags such as [laugh] are kept.",
+      "sentencePauses": "Sentence Pauses",
+      "sentencePausesHelp": "Adds an extra pause after every sentence.",
+      "replacements": "Sound Word Replacements",
+      "replacementsHelp": "One rule per line: word => how it should sound. Whole words, case-insensitive."
+    },
+    "openGallery": "Open Gallery"
+  },
+  "gallery": {
+    "title": "Gallery",
+    "stats_one": "{{count}} output · {{audio}} of audio · {{gen}} generating",
+    "stats_other": "{{count}} outputs · {{audio}} of audio · {{gen}} generating",
+    "search": "Search text or voice…",
+    "clearSearch": "Clear search",
+    "empty": "Nothing generated yet — your outputs will collect here.",
+    "noMatches": "No outputs match these filters.",
+    "end": "All {{count}} shown",
+    "filters": {
+      "title": "Filters",
+      "favoritesOnly": "Favorites only",
+      "any": "Any",
+      "voice": "Voice",
+      "engine": "Model",
+      "language": "Language",
+      "status": "Status",
+      "clear": "Clear all filters"
+    },
+    "status": {
+      "completed": "Completed",
+      "in_progress": "In progress",
+      "failed": "Failed"
+    },
+    "sort": {
+      "label": "Sort by",
+      "created_at": "Date created",
+      "duration": "Audio length",
+      "file_size": "File size",
+      "generation_seconds": "Generation time",
+      "profile_name": "Voice name",
+      "text_length": "Text length",
+      "desc": "Descending",
+      "asc": "Ascending"
+    },
+    "group": {
+      "label": "Group by",
+      "none": "No grouping",
+      "date": "Group: Date",
+      "profile": "Group: Voice",
+      "engine": "Group: Model",
+      "length": "Group: Length",
+      "language": "Group: Language",
+      "status": "Group: Status"
+    },
+    "view": {
+      "label": "View",
+      "grid": "Grid",
+      "list": "List"
+    },
+    "select": {
+      "toggle": "Select multiple (Ctrl/⌘+A selects all, Shift+click for a range, Esc to clear)"
+    },
+    "bulk": {
+      "selected_one": "{{count}} selected",
+      "selected_other": "{{count}} selected",
+      "selectAllLoaded": "Select all {{count}} loaded",
+      "download": "Download ZIP",
+      "clear": "Clear selection",
+      "deleted_one": "Deleted {{count}} output",
+      "deleted_other": "Deleted {{count}} outputs",
+      "failed": "Action failed"
+    },
+    "delete": {
+      "title_one": "Delete this output?",
+      "title_other": "Delete {{count}} outputs?",
+      "body_one": "The audio and all its versions will be permanently removed.",
+      "body_other": "The audio and all versions of {{count}} outputs will be permanently removed."
+    },
+    "actions": {
+      "cancel": "Cancel generation",
+      "retry": "Retry",
+      "versions": "Versions ({{count}})",
+      "favorite": "Favorite",
+      "unfavorite": "Unfavorite",
+      "copyText": "Copy text",
+      "reuseText": "Reuse text in editor"
+    },
+    "outputFolder": {
+      "tooltip": "Output folder",
+      "title": "Save new audio to"
     }
   }
 }

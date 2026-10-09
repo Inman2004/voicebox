@@ -25,6 +25,7 @@ export function useCreateProfile() {
     mutationFn: (data: VoiceProfileCreate) => apiClient.createProfile(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['libraryVoices'] });
     },
   });
 }
@@ -37,6 +38,7 @@ export function useUpdateProfile() {
       apiClient.updateProfile(profileId, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['libraryVoices'] });
       queryClient.invalidateQueries({
         queryKey: ['profiles', variables.profileId],
       });
@@ -51,6 +53,7 @@ export function useDeleteProfile() {
     mutationFn: (profileId: string) => apiClient.deleteProfile(profileId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['libraryVoices'] });
     },
   });
 }
@@ -94,6 +97,7 @@ export function useDeleteSample() {
     mutationFn: (sampleId: string) => apiClient.deleteProfileSample(sampleId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['libraryVoices'] });
     },
   });
 }
@@ -112,6 +116,7 @@ export function useUpdateSample() {
         queryKey: ['profiles', data.profile_id],
       });
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['libraryVoices'] });
     },
   });
 }
@@ -147,6 +152,7 @@ export function useImportProfile() {
     mutationFn: (file: File) => apiClient.importProfile(file),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['libraryVoices'] });
     },
   });
 }
@@ -159,6 +165,7 @@ export function useUploadAvatar() {
       apiClient.uploadAvatar(profileId, file),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['libraryVoices'] });
       queryClient.invalidateQueries({
         queryKey: ['profiles', variables.profileId],
       });
@@ -173,6 +180,7 @@ export function useDeleteAvatar() {
     mutationFn: (profileId: string) => apiClient.deleteAvatar(profileId),
     onSuccess: (_, profileId) => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['libraryVoices'] });
       queryClient.invalidateQueries({
         queryKey: ['profiles', profileId],
       });
